@@ -55,3 +55,25 @@ test('studio requires owner approval and uses an isolated Git worktree without m
     assert.equal(reload.list()[0].steps[0].prompt, undefined);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('QA step pauses until the owner confirms the external check', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-gate-'));
+  await mkdir(path.join(root, '.git'));
+  const manager = await new StudioManager({
+    repo: root, stateDir: root,
+    planner: async () => ({ summary: 'check', steps: [{ title: 'Native QA', role: 'qa', prompt: 'Verify Godot screenshot against target.', acceptance: ['owner-reviewed capture'] }] }),
+    decider: { route: async () => ({ role: 'qa', source: 'fixture' }) },
+    command: async () => ({ code: 0, stdout: '', stderr: '' }),
+    worker: async () => { throw new Error('QA must not run as a worker'); }
+  }).init();
+  try {
+    const task = await manager.create({ project: root, goal: 'Validate native scene' });
+    await manager.plan(task.id); await manager.approve(task.id); await manager.run(task.id);
+    assert.equal(manager.get(task.id).status, 'awaiting_owner');
+    await assert.rejects(manager.ownerReview(task.id, 'yes'), /explicit/);
+    await manager.ownerReview(task.id, true);
+    assert.equal(manager.get(task.id).status, 'approved');
+    await manager.run(task.id);
+    assert.equal(manager.get(task.id).status, 'awaiting_review');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
