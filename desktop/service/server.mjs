@@ -24,6 +24,7 @@ import { KnowledgeManager, MarkdownKnowledgeProvider } from './knowledge/provide
 import { IntegrationManager } from './integrations/manager.mjs';
 import { MobileGateway } from './mobile.mjs';
 import { StudioManager } from './studio/manager.mjs';
+import { LocalDecider } from './studio/decider.mjs';
 
 const listen = server => new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}`)); });
 
@@ -39,9 +40,10 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
   const projects = new ProjectAdapterRegistry();
   const integrations = await new IntegrationManager(stateDir).init();
   const mcp = new McpInventory(repo, mcpOptions);
-  const studio = await new StudioManager({ repo, stateDir }).init();
-  const sessions = await new Sessions(repo, stateDir).init();
   const environment = parseEnv(await readFile(path.join(repo, '.env'), 'utf8').catch(() => ''));
+  const routerModel = environment.MRMAK_STUDIO_ROUTER_MODEL?.trim() || process.env.MRMAK_STUDIO_ROUTER_MODEL?.trim() || 'qwen3.5:4b-q4_K_M';
+  const studio = await new StudioManager({ repo, stateDir, decider: new LocalDecider({ model: routerModel }) }).init();
+  const sessions = await new Sessions(repo, stateDir).init();
   const settingsPath = path.join(stateDir, 'settings.json');
   let settings = { defaultAgent: 'codex', defaultBypass: false, coordinatorModel: environment.MRMAK_COORDINATOR_MODEL?.trim() || null, terminalFontSize: 13, terminalAppearance: 'focus', workspaceTheme: 'dark', coordinatorEffort: 'medium', voiceName: 'cedar', voiceStyle: defaultVoiceStyle, ...await readJson(settingsPath, {}) };
   let selectedId = sessions.active().some(item => item.id === settings.selectedId) ? settings.selectedId : sessions.active()[0]?.id || null;

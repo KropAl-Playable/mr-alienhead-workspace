@@ -15,3 +15,6 @@
 @media(max-width:650px){.studio-body{grid-template-columns:1fr}.studio-detail{grid-column:1}.studio-dialog{padding:15px}}
 
 .studio-launch{width:auto;min-width:55px;padding:0 9px;font-size:12px;font-weight:600;color:#e4c29a;}
+
+/* Keep the Studio entry legible even if the standard icon button is fixed-width. */
+.chats-header-actions .studio-launch{width:auto;min-width:66px;flex:0 0 auto;padding:0 9px;font-size:12px;}

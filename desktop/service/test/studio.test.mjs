@@ -20,6 +20,7 @@ test('Qwen GGUF router uses local Ollama chat with strict JSON schema', async ()
   assert.equal(captured.body.format.type, 'object');
   assert.deepEqual(captured.body.format.properties.role.enum, ['codex', 'claude', 'qa']);
   assert.equal(captured.body.options.temperature, 0);
+  assert.ok(captured.body.options.num_predict > 64);
   assert.equal(captured.body.stream, false);
   assert.equal(parseDecision({ message: { content: '{"role":"codex"}' } }), 'codex');
   assert.equal(parseDecision({ message: { content: '{"role":"sudo"}' } }), null);
@@ -96,4 +97,41 @@ test('QA step pauses until the owner confirms the external check', async () => {
     await manager.run(task.id);
     assert.equal(manager.get(task.id).status, 'awaiting_review');
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('reasoning-only response triggers one bounded retry and preserves diagnostics', async () => {
+  const budgets = [];
+  let calls = 0;
+  const decider = new LocalDecider({ fetcher: async (url, init) => {
+    calls++;
+    budgets.push(JSON.parse(init.body).options.num_predict);
+    return { ok: true, json: async () => calls === 1
+      ? { done_reason: 'length', eval_count: 1024, message: { content: '', thinking: 'x'.repeat(20) } }
+      : { done_reason: 'stop', message: { content: '{"role":"claude"}' } } };
+  } });
+  const result = await decider.route({ title: 'Environment art', prompt: 'Author a lowpoly scene', role: 'codex' });
+  assert.equal(result.role, 'claude');
+  assert.equal(result.source, 'qwen3.5:4b-q4_K_M');
+  assert.deepEqual(budgets, [1024, 3072]);
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].finish, 'length');
+  assert.equal(result.diagnostics[0].thinkingChars, 20);
+});
+test('two malformed finals use safe fallback without exposing thinking text', async () => {
+  let calls = 0;
+  const decider = new LocalDecider({ fetcher: async () => {
+    calls++;
+    return { ok: true, json: async () => ({ done_reason: 'length', message: { content: '', thinking: 'private-thought' } }) };
+  } });
+  const result = await decider.route({ title: 'Menu art', prompt: 'Create warm lighting', role: 'claude' });
+  assert.equal(calls, 2);
+  assert.equal(result.source, 'codex-plan-fallback');
+  assert.equal(result.diagnostics.length, 2);
+  assert.ok(!JSON.stringify(result).includes('private-thought'));
+});
+test('router supports explicit model override for nonthinking Qwen Instruct', async () => {
+  const decider = new LocalDecider({ model: 'qwen3:4b-instruct-2507-q4_K_M',
+    fetcher: async () => ({ ok: true, json: async () => ({ message: { content: '{"role":"codex"}' } }) }) });
+  const result = await decider.route({ title: 'Mechanics', prompt: 'Implement card system', role: 'codex' });
+  assert.equal(result.source, 'qwen3:4b-instruct-2507-q4_K_M');
 });

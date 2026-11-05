@@ -41,3 +41,41 @@ This first release does NOT automatically merge feature branches, run long QA jo
 Source skills are in .agents/skills; Claude copies are in .claude/skills. Use npm run skills:sync after changing the source skill. Relevant preexisting modules: game-ui-workflow, gameplay-visual-review, materials-to-game, image-reference-workflow, blender-game-animation, feature-handoff.
 
 An owner-review stop can be confirmed in Studio after manually completing the named QA or creative check; confirmation only records the owner's decision, not a passed automated test. Interrupted batches require manual worktree/receipt inspection before Recovery; the pending step may repeat actions.
+
+## Why Studio may not appear after npm run build (Windows)
+
+The desktop UI and Node service are packaged inside the **installed Tauri executable**. The repository's `Start Mr. Mak.cmd` prefers `%LOCALAPPDATA%\\Mr. Mak Workspace\\mrmak-workspace.exe` when present. Building the React UI with `npm run build` updates `dist/`, but it does **not** update an installed desktop runtime. A screenshot without Studio in the Chats header generally means the old executable is still running.
+
+To install a current desktop build from the Studio branch:
+
+1. Save ongoing CLI work. From the tray/menu, **quit** Mr. Mak completely; closing a window may only hide it. Do not force-kill live sessions.
+2. Pull `feat/ai-multiagent-studio`, then run `powershell -NoProfile -ExecutionPolicy Bypass -File .\\Setup.ps1 -Mode Desktop`. This requires Rust and Windows C++ build tools (see docs/getting-started.md).
+3. Run the generated NSIS installer from `src-tauri/target/release/bundle/nsis/`. It updates the **installed runtime**, including both web UI and local service.
+4. Launch via `Start Mr. Mak.cmd`. Look for **Studio** in the Chats header, to the left of the phone icon. Do not install an older GitHub Release over the development build.
+
+Building a new installer does not automatically activate it. Avoid replacing or restarting a running user's application without consent.
+
+## Qwen3.5 final JSON diagnostics
+
+Qwen3.5 can spend an overly small output budget on internal reasoning and return `message.content: ""`. The router now uses budgets of 1024 then 3072 tokens, records only metadata (never internal thinking text), and falls back to the Codex-authored assignment after two invalid results. The request deliberately omits `think: false` because some Ollama versions fail to honor JSON-schema constraints in that mode.
+
+Run `node scripts/check-studio-router.mjs`. If both attempts remain invalid, install the simpler non-thinking alternative:
+
+```powershell
+ollama pull qwen3:4b-instruct-2507-q4_K_M
+```
+
+Add to the repository's ignored `.env`:
+
+```text
+MRMAK_STUDIO_ROUTER_MODEL=qwen3:4b-instruct-2507-q4_K_M
+```
+
+The installed Studio service reads this variable on startup; the standalone smoke-test script reads a **process environment variable**. To test the alternative from PowerShell without editing code, use:
+
+```powershell
+$env:MRMAK_STUDIO_ROUTER_MODEL = 'qwen3:4b-instruct-2507-q4_K_M'
+node scripts/check-studio-router.mjs
+```
+
+If any problem persists, collect just the diagnostic metadata (`done_reason`, `contentChars`, `thinkingChars`, Ollama version); do not paste entire prompts or raw thinking.
