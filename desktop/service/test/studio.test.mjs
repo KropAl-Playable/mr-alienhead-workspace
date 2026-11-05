@@ -135,3 +135,57 @@ test('router supports explicit model override for nonthinking Qwen Instruct', as
   const result = await decider.route({ title: 'Mechanics', prompt: 'Implement card system', role: 'codex' });
   assert.equal(result.source, 'qwen3:4b-instruct-2507-q4_K_M');
 });
+
+test('worktree checkout timeout leaves all steps pending and permits guarded owner retry', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-timeout-'));
+  await mkdir(path.join(root, '.git'));
+  let calls = 0, executed = 0;
+  const manager = await new StudioManager({
+    repo: root, stateDir: root,
+    planner: async () => ({ summary: 'report', steps: [{ title: 'Technical summary', role: 'codex', prompt: 'Read code and report.', acceptance: ['report'] }] }),
+    decider: { route: async () => ({ role: 'codex', source: 'fixture' }) },
+    command: async (_file, _args, options) => {
+      calls++;
+      assert.equal(options.phase, 'Git worktree checkout');
+      assert.equal(options.timeoutMs, 300000);
+      if (calls === 1) throw Object.assign(new Error('Git worktree checkout timed out after 300 seconds.'), { code: 'STUDIO_TIMEOUT' });
+      return { code: 0, stdout: '', stderr: '' };
+    },
+    worker: async () => { executed++; return { code: 0, stdout: 'Report saved.', stderr: '' }; }
+  }).init();
+  try {
+    const task = await manager.create({ project: root, goal: 'Review golden targets' });
+    await manager.plan(task.id); await manager.approve(task.id);
+    await assert.rejects(manager.run(task.id), /Git worktree checkout timed out/);
+    assert.equal(manager.get(task.id).status, 'blocked');
+    assert.equal(manager.get(task.id).phase, 'worktree_setup_failed');
+    assert.ok(manager.get(task.id).steps.every(step => step.state === 'pending'));
+    assert.equal(executed, 0);
+    await manager.retrySetup(task.id); await manager.run(task.id);
+    assert.equal(manager.get(task.id).status, 'awaiting_review');
+    assert.equal(calls, 2);
+    assert.equal(executed, 1);
+    await assert.rejects(manager.retrySetup(task.id), /Only blocked worktree setup/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('worker exception is reported as failed, not left permanently running', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-worker-'));
+  await mkdir(path.join(root, '.git'));
+  const manager = await new StudioManager({
+    repo: root, stateDir: root,
+    planner: async () => ({ summary: 'report', steps: [{ title: 'Technical summary', role: 'codex', prompt: 'Inspect code.', acceptance: ['report'] }] }),
+    decider: { route: async () => ({ role: 'codex', source: 'fixture' }) },
+    command: async () => ({ code: 0, stdout: '', stderr: '' }),
+    worker: async () => { throw new Error('Codex CLI timed out'); }
+  }).init();
+  try {
+    const task = await manager.create({ project: root, goal: 'Review golden targets' });
+    await manager.plan(task.id); await manager.approve(task.id);
+    await assert.rejects(manager.run(task.id), /Codex CLI timed out/);
+    assert.equal(manager.get(task.id).status, 'blocked');
+    assert.equal(manager.get(task.id).steps[0].state, 'failed');
+    assert.equal(manager.get(task.id).phase, 'worker_failed');
+    await assert.rejects(manager.retrySetup(task.id), /Only blocked worktree setup/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

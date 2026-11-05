@@ -79,3 +79,19 @@ node scripts/check-studio-router.mjs
 ```
 
 If any problem persists, collect just the diagnostic metadata (`done_reason`, `contentChars`, `thinkingChars`, Ollama version); do not paste entire prompts or raw thinking.
+
+## Blocked during worktree preparation (Windows / large Godot repositories)
+
+If Studio shows `blocked`, **all steps still `pending`**, and the reason is `Worker timeout`, the old build likely timed out in its 30-second `git worktree add` phase. This happens **before Codex/Claude execute an assignment**; it is not proof that the agents failed the visual task.
+
+The new build:
+- Reports `phase: preparing_worktree` while making the isolated checkout.
+- Allows 300 seconds for the initial Git checkout instead of 30 seconds.
+- Shows `Git worktree checkout timed out after 300 seconds` if it still cannot finish.
+- Offers **Retry worktree setup** only when the task is blocked, no worker has started, and the owner clicks the button.
+- If a prior checkout is present, verifies its Git top-level and `studio/<task-id>` branch; it never deletes or overwrites unknown files.
+- Reports a worker failure separately with the failed step rather than leaving a running step indefinitely.
+
+**Recovery procedure:** update and reinstall the desktop app, quit the older version completely, open Studio, select the original blocked task, check for any active Git checkout process or partial checkout in `.mrmak/studio/worktrees/<task-id>`, and click **Retry worktree setup**. If Git reports an orphan branch or an incomplete checkout, stop and inspect it; do not force-remove the branch or folder automatically.
+
+The first planned QA stage still requires manual owner confirmation in this MVP. Studio does not claim automated game testing for that stage.

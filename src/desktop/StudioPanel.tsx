@@ -3,7 +3,7 @@ import { api } from './client'
 import './studio.css'
 
 type StudioStep = { id: number; title: string; role: string; state: string; decision?: { role: string; source: string }; acceptance: string[] }
-type StudioTask = { id: string; project: string; goal: string; status: string; summary: string; approved: boolean; note?: string; worktree?: string; steps: StudioStep[] }
+type StudioTask = { id: string; project: string; goal: string; status: string; phase?: string | null; summary: string; approved: boolean; note?: string; worktree?: string; steps: StudioStep[] }
 export default function StudioPanel({ close, projectFolder }: { close: () => void; projectFolder: string }) {
   const [project, setProject] = useState(projectFolder)
   const [goal, setGoal] = useState('')
@@ -25,6 +25,7 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
   }
   const action = async (name: string) => {
     if (!current) return
+    if (name === 'retry-setup' && !window.confirm('The setup was blocked before any agent step started. Have you checked for leftover Git processes or a partial worktree? Retry worktree setup?')) return
     if (name === 'recover' && !window.confirm('Have you inspected the interrupted worktree and any paid-generation receipts? A failed step may be retried.')) return
     if (name === 'owner-review' && !window.confirm('Confirm that you personally completed the required QA or creative review. This is not an automated QA pass.')) return
     if (name === 'run' && !window.confirm('Run this approved batch using your Codex and Claude CLI subscriptions? It may consume plan limits. No external paid generations are authorized.')) return
@@ -44,7 +45,7 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
     <section className="studio-queue"><h3>Production queue</h3>
       <div className="studio-task-list">{tasks.map(t => <button key={t.id} className={current?.id === t.id ? 'chosen' : ''} onClick={() => setSelected(t.id)}><strong>{t.goal.slice(0, 84)}</strong><small>{t.status} · {t.project.split(/[\\/]/).pop()}</small></button>)}</div>
     </section>
-    {current && <section className="studio-detail"><h3>{current.status.replace(/_/g, ' ')}</h3><p>{current.summary || current.goal}</p>
+    {current && <section className="studio-detail"><h3>{current.status.replace(/_/g, ' ')}</h3>{current.phase && <small>Phase: {current.phase.replace(/_/g, ' ')}</small>}<p>{current.summary || current.goal}</p>
       {current.steps.map(step => <div className="studio-step" key={step.id}><strong>{step.id}. {step.title}</strong><span>{step.decision?.role || step.role} · {step.state}</span>{step.acceptance?.length > 0 && <small>{step.acceptance.join(' · ')}</small>}</div>)}
       {current.note && <p className="studio-warning">{current.note}</p>}
       {current.worktree && <small>Worktree: {current.worktree}</small>}
@@ -54,6 +55,7 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
         {current.status === 'approved' && <button disabled={working} onClick={() => void action('run')}>Run batch</button>}
         {current.status === 'awaiting_owner' && <button disabled={working} onClick={() => void action('owner-review')}>I completed the review · Continue</button>}
         {current.status === 'interrupted' && <button disabled={working} onClick={() => void action('recover')}>Recover after inspection</button>}
+        {current.status === 'blocked' && !current.worktree && current.steps.every(step => step.state === 'pending') && <button disabled={working} onClick={() => void action('retry-setup')}>Retry worktree setup</button>}
       </div>
     </section>}
     {error && <p className="desk-error-inline" role="alert">{error}</p>}

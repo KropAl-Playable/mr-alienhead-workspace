@@ -93,22 +93,63 @@ export class StudioManager {
     task.note = 'Recovery approved after manual inspection. A pending step may repeat work: check paid-generation receipts before continuing.';
     await this.persist(); return this.publicTask(task);
   }
+  async retrySetup(id) {
+    const task = this.get(id);
+    if (this.busy.has(id) || task.status !== 'blocked' || !task.approved
+      || task.worktree || task.steps.some(step => step.state !== 'pending')) {
+      throw new Error('Only blocked worktree setup with no started steps can be retried.');
+    }
+    // Explicit owner action. Do not auto-clean an ambiguous or partial checkout.
+    task.status = 'approved';
+    task.phase = null;
+    task.note = 'Owner requested worktree setup retry. Any existing checkout will be verified before continuing.';
+    await this.persist(); return this.publicTask(task);
+  }
   async run(id) {
     const task = this.get(id);
     if (!task.approved || !['approved', 'interrupted'].includes(task.status) || this.busy.has(id)) throw new Error('Owner approval required before execution.');
-    this.busy.add(id); task.status = 'running'; await this.persist();
+    this.busy.add(id); task.status = 'running'; task.phase = 'preparing_worktree';
+    task.note = 'Preparing isolated Git worktree (large game repositories can take several minutes).';
+    await this.persist();
     try {
       const worktree = path.join(this.dir, 'worktrees', task.id);
       if (!task.worktree) {
         await mkdir(path.dirname(worktree), { recursive: true });
-        const added = await this.command('git', ['-C', task.project, 'worktree', 'add', '-b', 'studio/' + task.id, worktree, 'HEAD'], { cwd: task.project, timeoutMs: 30000 });
-        if (added.code !== 0) throw new Error('Could not create isolated worktree: ' + added.stderr.slice(-500));
-        task.worktree = worktree; await this.persist();
+        const existing = await stat(worktree).catch(() => null);
+        if (existing) {
+          // A previous git command might have finished after the timeout. Never
+          // overwrite an existing checkout: verify its root and branch first.
+          const root = await this.command('git', ['-C', worktree, 'rev-parse', '--show-toplevel'],
+            { cwd: task.project, timeoutMs: 20000, phase: 'verify existing worktree' });
+          const branch = await this.command('git', ['-C', worktree, 'branch', '--show-current'],
+            { cwd: task.project, timeoutMs: 20000, phase: 'verify existing branch' });
+          const actualRoot = root.stdout?.trim().replaceAll('\\', '/').toLowerCase();
+          const expectedRoot = worktree.replaceAll('\\', '/').toLowerCase();
+          if (root.code !== 0 || actualRoot !== expectedRoot
+            || branch.code !== 0 || branch.stdout?.trim() !== 'studio/' + task.id) {
+            throw new Error('An incomplete or unexpected worktree already exists at ' + worktree
+              + '. Inspect it manually; Studio will not overwrite it.');
+          }
+          task.worktree = worktree;
+        } else {
+          const added = await this.command('git',
+            ['-C', task.project, 'worktree', 'add', '-b', 'studio/' + task.id, worktree, 'HEAD'],
+            { cwd: task.project, timeoutMs: 300000, phase: 'Git worktree checkout' });
+          if (added.code !== 0) throw new Error('Could not create isolated worktree: ' + added.stderr.slice(-500));
+          task.worktree = worktree;
+        }
+        await this.persist();
       }
+      task.phase = 'dispatching';
+      task.note = 'Worktree ready. Assigning first pending step.';
+      await this.persist();
       for (const step of task.steps) {
         if (step.state === 'completed') continue;
         const decision = await this.decider.route(step);
-        step.decision = decision; step.state = 'running'; await this.persist();
+        step.decision = decision; step.state = 'running';
+        task.phase = 'step_' + step.id;
+        task.note = 'Running step ' + step.id + ': ' + step.title;
+        await this.persist();
         const role = decision.role;
         if (role === 'qa' || step.needsOwnerReview) {
           step.state = 'awaiting_owner'; task.status = 'awaiting_owner';
@@ -125,11 +166,16 @@ export class StudioManager {
         }
         step.state = 'completed'; await this.persist();
       }
-      task.status = 'awaiting_review';
+      task.status = 'awaiting_review'; task.phase = null;
       task.note = 'No merge performed. Technical and visual QA, real Godot screenshots and final owner acceptance are required.';
       await this.persist(); return this.publicTask(task);
     } catch (error) {
-      task.status = 'blocked'; task.note = String(error.message || error).slice(0, 700);
+      task.status = 'blocked';
+      const step = task.steps.find(s => s.state === 'running');
+      if (step) step.state = 'failed'; // The worker may have created partial files.
+      task.note = String(error.message || error).slice(0, 700)
+        + (step ? ' Inspect the partial step output before retrying.' : ' No agent step has started.');
+      task.phase = step ? 'worker_failed' : 'worktree_setup_failed';
       await this.persist(); throw error;
     } finally { this.busy.delete(id); }
   }

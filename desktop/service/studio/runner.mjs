@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { codexBinary, commandPath, wrapCommand } from '../agents.mjs';
 
-export async function runCommand(file, args, { cwd, input = '', timeoutMs = 30 * 60 * 1000, spawnFn = spawn } = {}) {
+export async function runCommand(file, args, { cwd, input = '', timeoutMs = 30 * 60 * 1000, phase = 'Worker', spawnFn = spawn } = {}) {
   return await new Promise((resolve, reject) => {
     const child = spawnFn(file, args, { cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     let stdout = '', stderr = '', done = false;
@@ -14,7 +14,13 @@ export async function runCommand(file, args, { cwd, input = '', timeoutMs = 30 *
       if (error) reject(error);
       else resolve({ code, stdout: stdout.slice(-24000), stderr: stderr.slice(-8000) });
     };
-    const timer = setTimeout(() => { child.kill(); finish(new Error('Worker timeout')); }, timeoutMs);
+    const timer = setTimeout(() => {
+      child.kill();
+      const error = new Error(phase + ' timed out after ' + Math.round(timeoutMs / 1000)
+        + ' seconds. Check the worktree and the CLI process before retrying.');
+      error.code = 'STUDIO_TIMEOUT';
+      finish(error);
+    }, timeoutMs);
     child.on('error', error => finish(error));
     child.on('close', code => finish(null, code));
     child.stdout?.on('data', data => { stdout = (stdout + data.toString()).slice(-24000); });
