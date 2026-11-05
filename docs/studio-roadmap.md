@@ -4,7 +4,7 @@ Project: **Mr. Mak Workspace**, preserving its real CLI PTYs, mobile access, car
 
 ## Studio v0: integrated opt-in MVP (this PR)
 - [x] Codex-first structured multi-step planning from the owner task.
-- [x] pplx-decider-flash with local Ollama System One typed choice; Codex-plan fallback.
+- [x] Qwen3.5-4B Q4_K_M with local Ollama structured JSON routing; Codex-plan fallback.
 - [x] Claude Code as art/UX/animation specialist and Codex as tech/gameplay lead.
 - [x] Owner plan approval, local task persistence, isolated Git worktrees, no auto merge.
 - [x] Status panel in Chats and one-time owner review / interrupted-task recovery.
@@ -37,7 +37,7 @@ Acceptance: close Road Trip's main-menu art gap with repeatable screenshot evide
 - Enforce Tripo ledger (1500 starting credits, 2 attempts by default, 3rd explicit), audio/web-generation consent, asset provenance and licenses.
 - For RTX 4070 12 GB, do not leave the 4B local model resident during heavy engine/Blender rendering if it causes VRAM contention.
 - Make repeated/failed generations idempotent by external job ID; do not spend again after a timeout without checking receipts.
-- For reviews, the decider returns only routing/boolean decisions; Claude performs the detailed visual analysis.
+- For reviews, the router is restricted to schema-validated routing/boolean outputs; Claude performs detailed visual analysis. Qwen3.5 is not a specialist decision model.
 
 Acceptance: reproducible QA on stable commits; zero unauthorized paid jobs; resumable receipts.
 

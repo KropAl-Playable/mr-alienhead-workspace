@@ -34,7 +34,7 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
     finally { setWorking(false) }
   }
   return <div className="desk-scrim" onClick={close}><section className="studio-dialog" onClick={e => e.stopPropagation()} aria-label="AI Game Studio">
-    <header><div><small>MR. MAK • MULTI-AGENT</small><h2>AI Game Studio</h2><p>Codex plans · pplx-decider routes · Claude directs art · owner approves</p></div><button className="desk-icon" onClick={close} aria-label="Close Studio">×</button></header>
+    <header><div><small>MR. MAK • MULTI-AGENT</small><h2>AI Game Studio</h2><p>Codex plans · local Qwen routes · Claude directs art · owner approves</p></div><button className="desk-icon" onClick={close} aria-label="Close Studio">×</button></header>
     <div className="studio-body"><section className="studio-new">
       <label>Game repository (absolute path)<input value={project} spellCheck={false} onChange={e => setProject(e.target.value)} /></label>
       <label>Production objective<textarea rows={3} placeholder="e.g. Bring Road Trip main menu to the approved golden target…" value={goal} onChange={e => setGoal(e.target.value)} /></label>

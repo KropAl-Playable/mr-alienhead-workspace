@@ -49,4 +49,4 @@ read the sample cards.
 
 ## Experimental AI Game Studio
 
-Read `.agents/skills/ai-game-studio/SKILL.md` and `docs/studio-mode.md` when running a cross-agent game task. Codex plans first, Claude handles art/UX/animation, and pplx-decider-flash proposes routes via localhost System One. No auto-merging, paid generations or long workstation QA without owner approval. Studio runtime is local under `.mrmak/studio`.
+Read `.agents/skills/ai-game-studio/SKILL.md` and `docs/studio-mode.md` when running a cross-agent game task. Codex plans first, Claude handles art/UX/animation, and Qwen3.5-4B Q4_K_M proposes routes via localhost Ollama /api/chat with a validated JSON schema. No auto-merging, paid generations or long workstation QA without owner approval. Studio runtime is local under `.mrmak/studio`.

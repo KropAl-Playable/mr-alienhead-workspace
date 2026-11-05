@@ -49,7 +49,7 @@ dictation need no Mr. Mak transcription key.
 
 ## AI Game Studio (experimental)
 
-The **Studio** button in Chats opens an opt-in multi-agent workflow: Codex plans the original task, local pplx-decider-flash proposes a route, and Codex/Claude Code workers operate in an isolated Git worktree after owner approval. Nothing auto-merges or spends external-generation credits. This is an initial integration, not an unattended studio. See [Studio Mode setup and limitations](docs/studio-mode.md).
+The **Studio** button in Chats opens an opt-in multi-agent workflow: Codex plans the original task, local Qwen3.5-4B GGUF proposes a route, and Codex/Claude Code workers operate in an isolated Git worktree after owner approval. Nothing auto-merges or spends external-generation credits. This is an initial integration, not an unattended studio. See [Studio Mode setup and limitations](docs/studio-mode.md).
 
 ## Everyday tools
 

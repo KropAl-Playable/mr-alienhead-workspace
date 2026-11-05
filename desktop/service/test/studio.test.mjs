@@ -6,18 +6,38 @@ import os from 'node:os';
 import { LocalDecider, parseDecision, deterministicRoute } from '../studio/decider.mjs';
 import { StudioManager, validatePlan } from '../studio/manager.mjs';
 
-test('pplx-decider uses typed /v1/systemone instead of the chat API', async () => {
+test('Qwen GGUF router uses local Ollama chat with strict JSON schema', async () => {
   let captured;
   const decider = new LocalDecider({ fetcher: async (url, init) => {
     captured = { url, body: JSON.parse(init.body) };
-    return { ok: true, json: async () => ({ answers: { worker: { choice: 'claude', confidence: 0.97 } } }) };
+    return { ok: true, json: async () => ({ message: { content: '{"role":"claude"}' } }) };
   } });
   const result = await decider.route({ title: 'Lighting', prompt: 'Improve menu lighting', role: 'codex' });
   assert.equal(result.role, 'claude');
-  assert.match(captured.url, /\/v1\/systemone$/);
-  assert.equal(captured.body.model, 'pplx-decider-flash');
-  assert.equal(captured.body.questions.worker.type, 'choice');
-  assert.equal(parseDecision({ answers: { worker: { choice: 'codex' } } }), 'codex');
+  assert.equal(result.source, 'qwen3.5:4b-q4_K_M');
+  assert.match(captured.url, /\/api\/chat$/);
+  assert.equal(captured.body.model, 'qwen3.5:4b-q4_K_M');
+  assert.equal(captured.body.format.type, 'object');
+  assert.deepEqual(captured.body.format.properties.role.enum, ['codex', 'claude', 'qa']);
+  assert.equal(captured.body.options.temperature, 0);
+  assert.equal(captured.body.stream, false);
+  assert.equal(parseDecision({ message: { content: '{"role":"codex"}' } }), 'codex');
+  assert.equal(parseDecision({ message: { content: '{"role":"sudo"}' } }), null);
+  assert.equal(parseDecision({ message: { content: 'not-json' } }), null);
+});
+test('planned QA is a mandatory gate even if a model would reassign it', async () => {
+  let called = false;
+  const decider = new LocalDecider({ fetcher: async () => { called = true; throw Error('unexpected'); } });
+  const result = await decider.route({ title: 'Native QA', prompt: 'Run screenshots', role: 'qa' });
+  assert.equal(result.role, 'qa');
+  assert.equal(result.source, 'codex-plan-qa-gate');
+  assert.equal(called, false);
+});
+test('malformed Ollama response fails safe to Codex-authored role', async () => {
+  const decider = new LocalDecider({ fetcher: async () => ({ ok: true, json: async () => ({ message: { content: '{"role":"root"}' } }) }) });
+  const result = await decider.route({ title: 'Animation', prompt: 'Rig fox', role: 'claude' });
+  assert.equal(result.role, 'claude');
+  assert.equal(result.source, 'codex-plan-fallback');
 });
 test('offline decision falls back to Codex-authored assignment, never an unauthorized origin', async () => {
   const decider = new LocalDecider({ fetcher: async () => { throw new Error('offline'); } });

@@ -1,6 +1,6 @@
 ---
 name: ai-game-studio
-description: Coordinate Codex, Claude Code, pplx-decider-flash and game QA in Mr. Mak Workspace.
+description: Coordinate Codex, Claude Code, Qwen3.5-4B Q4_K_M and game QA in Mr. Mak Workspace.
 ---
 
 # AI Game Studio
@@ -11,13 +11,13 @@ Use Mr. Mak Workspace as the host. Read project GDD, ART_BIBLE, frozen golden ta
 - Owner: Game Director; approves art direction, budgets, long tests, publishing and major changes.
 - Codex: receives original task; Game Designer, Technical Director and Gameplay Engineer; writes plan and specialist prompts.
 - Claude Code: Art Director, Principal UI/UX, Animator, environment/lookdev and visual review.
-- pplx-decider-flash: typed decision router through Ollama System One; cannot generate text or override spending/permissions.
+- Qwen3.5-4B Q4_K_M: schema-constrained local routing via Ollama /api/chat; can generate text but its output must be validated and cannot override spending/permissions.
 - QA: deterministic tests and real engine screenshots; decider plus Claude review visual evidence.
 
 ## Procedure
 1. Codex creates 2–8 substantial tasks with exact prompts and testable acceptance criteria.
 2. Owner approves the production batch once.
-3. For each step, query local Ollama via POST /v1/systemone with a typed choice decision; never use /api/chat for decider.
+3. For each step, query local Ollama via POST /api/chat with a strict JSON schema for role; validate codex|claude|qa. The Windows/NVIDIA-compatible GGUF model is qwen3.5:4b-q4_K_M. Never use the MLX-only pplx-decider-flash.
 4. Delegate narrowly to the specialist; send only necessary file paths, selected references and output requirements.
 5. Keep each batch in an isolated Git worktree. No concurrent editing of the same .tscn/.blend or sharing a live editor between writers.
 6. Capture real in-engine screenshots, logs and stable Git commit IDs for review.
@@ -37,5 +37,5 @@ Tripo: default two generations per brief, maximum three only with owner budget a
 No CAPTCHA bypass, unauthorized purchases, new accounts, paid generations or external publishing.
 
 ## Permission and failure policy
-Fast local validation can run automatically. GPU-intensive native tests and long QA need owner permission. If decider is offline, keep the Codex-authored role with a warning. Never allow a model to grant itself permissions. Never claim a CLI process exit proves game quality.
+Fast local validation can run automatically. GPU-intensive native tests and long QA need owner permission. If the router is offline, keep the Codex-authored role with a warning. A planned QA step cannot be reassigned away by the local model. Never allow a model to grant itself permissions. Never claim a CLI process exit proves game quality.
 Current Studio Mode is an opt-in MVP; read docs/studio-mode.md for exact supported behavior and limitations.
