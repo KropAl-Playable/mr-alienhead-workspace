@@ -13,3 +13,5 @@
 .studio-actions{display:flex;gap:10px;margin-top:12px}.studio-actions button{border:1px solid #e2b185;border-radius:9px;padding:9px 16px;background:#e7c299;color:#342b2a;cursor:pointer;font-weight:600}
 .studio-actions button:disabled{opacity:.5}.studio-warning{color:#ffd39c!important}
 @media(max-width:650px){.studio-body{grid-template-columns:1fr}.studio-detail{grid-column:1}.studio-dialog{padding:15px}}
+
+.studio-launch{width:auto;min-width:55px;padding:0 9px;font-size:12px;font-weight:600;color:#e4c29a;}

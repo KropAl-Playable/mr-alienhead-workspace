@@ -46,3 +46,7 @@ read the sample cards.
 `knowledge/`: lessons.
 `context/`: the owner's optional preferences and goals.
 `inbox/`: incoming references.
+
+## Experimental AI Game Studio
+
+Read `.agents/skills/ai-game-studio/SKILL.md` and `docs/studio-mode.md` when running a cross-agent game task. Codex plans first, Claude handles art/UX/animation, and pplx-decider-flash proposes routes via localhost System One. No auto-merging, paid generations or long workstation QA without owner approval. Studio runtime is local under `.mrmak/studio`.
