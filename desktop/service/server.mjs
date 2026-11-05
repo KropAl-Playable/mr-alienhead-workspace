@@ -23,6 +23,7 @@ import { ProjectAdapterRegistry } from './project-adapters/registry.mjs';
 import { KnowledgeManager, MarkdownKnowledgeProvider } from './knowledge/providers.mjs';
 import { IntegrationManager } from './integrations/manager.mjs';
 import { MobileGateway } from './mobile.mjs';
+import { StudioManager } from './studio/manager.mjs';
 
 const listen = server => new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}`)); });
 
@@ -38,6 +39,7 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
   const projects = new ProjectAdapterRegistry();
   const integrations = await new IntegrationManager(stateDir).init();
   const mcp = new McpInventory(repo, mcpOptions);
+  const studio = await new StudioManager({ repo, stateDir }).init();
   const sessions = await new Sessions(repo, stateDir).init();
   const environment = parseEnv(await readFile(path.join(repo, '.env'), 'utf8').catch(() => ''));
   const settingsPath = path.join(stateDir, 'settings.json');
@@ -195,6 +197,24 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
         if (method === 'GET' && url.pathname === '/api/workspace') return json(response, 200, await registry());
         const cardMetadata = url.pathname.match(/^\/api\/workspace\/entities\/([^/]+)$/);
         if (method === 'PATCH' && cardMetadata) return json(response, 200, await workspace.update(decodeURIComponent(cardMetadata[1]), metadataPatch(data)));
+        if (method === 'GET' && url.pathname === '/api/studio/tasks') return json(response, 200, { tasks: studio.list() });
+        if (method === 'POST' && url.pathname === '/api/studio/tasks') return json(response, 201, await studio.create(data));
+        const studioAction = /^\/api\/studio\/tasks\/([\w-]+)\/(plan|approve|run|route)$/.exec(url.pathname);
+        if (studioAction) {
+          const [, id, action] = studioAction;
+          if (method === 'GET' && action === 'route') return json(response, 200, await studio.routing(id));
+          if (method === 'POST' && action === 'approve') return json(response, 200, await studio.approve(id));
+          if (method === 'POST' && action === 'plan') {
+            void studio.plan(id).catch(() => {});
+            return json(response, 202, { started: true, id, action });
+          }
+          if (method === 'POST' && action === 'run') {
+            const task = studio.get(id);
+            if (!task.approved || task.status !== 'approved') throw Object.assign(new Error('Approve the Codex plan before starting'), { status: 409 });
+            void studio.run(id).catch(() => {});
+            return json(response, 202, { started: true, id, action });
+          }
+        }
         if (method === 'GET' && url.pathname === '/api/projects') {
           const matches = await projects.detect(url.searchParams.get('path') || repo);
           return json(response, 200, { matches, adapters: projects.adapters.map(item => ({ id: item.id, label: item.label })) });

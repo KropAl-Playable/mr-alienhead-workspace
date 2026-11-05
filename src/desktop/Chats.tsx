@@ -8,6 +8,7 @@ import { chatActivityLabel } from './chatActivity'
 import ChatTabs from './ChatTabs'
 import { orderedChats, tabColors } from './chatOrder'
 import MobileAccess from './MobileAccess'
+import StudioPanel from './StudioPanel'
 
 function NewChat({ close }: { close: () => void }) {
   const state = useDesktop()
@@ -72,6 +73,7 @@ export default function Chats() {
   const [title, setTitle] = useState('')
   const [pinned, setPinned] = useState(false)
   const [fontSize, setFontSize] = useState(() => state.settings.terminalFontSize || 13)
+  const [studioOpen, setStudioOpen] = useState(false)
   const [attachmentNotice, setAttachmentNotice] = useState({ id: '', text: '' })
   const attachmentStatus = useCallback((id: string, text: string) => setAttachmentNotice(current => text || current.id === id ? { id, text } : current), [])
   const active = orderedChats(state.sessions)
@@ -123,7 +125,7 @@ export default function Chats() {
   async function rename(event: React.FormEvent) { event.preventDefault(); if (!session) return; try { await api(`/sessions/${session.id}`, { name: title }, 'PATCH'); setRenaming(false) } catch (error) { reportError(error) } }
 
   return <div className="chats-surface">
-    <header className="chats-header"><div className="chats-brand"><Nose size={25} tone="black" /><span>Mr. Mak <b>Chats</b></span></div><div className="chats-header-actions"><MobileAccess /><button className={`desk-icon ${pinned ? 'active' : ''}`} title="Keep Chats above other windows" onClick={() => { setPinned(!pinned); windowAction('chats', 'pin', !pinned) }}><Icon name="pin" size={16} /></button><button className="desk-icon" title="Show Workspace" onClick={() => windowAction('workspace')}><Icon name="workspace" size={18} /></button></div></header>
+    <header className="chats-header"><div className="chats-brand"><Nose size={25} tone="black" /><span>Mr. Mak <b>Chats</b></span></div><div className="chats-header-actions"><button className="desk-icon" title="AI Game Studio" aria-label="Open AI Game Studio" onClick={() => setStudioOpen(true)}>Studio</button><MobileAccess /><button className={`desk-icon ${pinned ? 'active' : ''}`} title="Keep Chats above other windows" onClick={() => { setPinned(!pinned); windowAction('chats', 'pin', !pinned) }}><Icon name="pin" size={16} /></button><button className="desk-icon" title="Show Workspace" onClick={() => windowAction('workspace')}><Icon name="workspace" size={18} /></button></div></header>
     <div className="chat-tabs-row"><ChatTabs items={active} selectedId={session?.id} agents={state.agents} choose={choose} close={closeChat} /><div className="chat-tab-actions"><button className="desk-icon new-chat-button" onClick={() => setNewChat(true)} title="New chat · Ctrl+Shift+T" aria-label="New chat"><Icon name="plus" /></button><button className={`desk-icon ${switcher ? 'active' : ''}`} onClick={() => { setSwitcher(value => !value); setHistory(false) }} title="Find a chat · Ctrl+Shift+P" aria-label="Find a chat"><Icon name="search" size={16} /></button><button className={`history-button ${history ? 'active' : ''}`} onClick={() => { setHistory(value => !value); setSwitcher(false); setMenu(false) }} title="History · Ctrl+Shift+H"><Icon name="history" size={15} /><span>History</span></button></div></div>
     <div className="chat-body">
     {history && <History close={() => setHistory(false)} choose={choose} />}
@@ -137,5 +139,6 @@ export default function Chats() {
     </> : <div className="chats-empty"><div className="empty-orbit"><Nose size={64} tone="black" /></div><span className="desk-eyebrow">ROOM TO THINK</span><h1>Your agents,<br />close at hand.</h1><p>A chat for each task.<br />Keep this window beside whatever<br />you are working on.</p><button className="desk-primary" onClick={() => setNewChat(true)}><Icon name="plus" size={17} />Open your first chat</button><div className="empty-agent-names"><span>Claude</span><span>Codex</span><span>OpenCode</span><span>Kimi</span></div><small>Your CLI accounts. Your local files.</small></div>}
     </div>
     {newChat && <NewChat close={() => setNewChat(false)} />}
+    {studioOpen && <StudioPanel close={() => setStudioOpen(false)} projectFolder={session?.cwd || state.repo} />}
   </div>
 }
