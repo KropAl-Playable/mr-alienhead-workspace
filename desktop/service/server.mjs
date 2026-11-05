@@ -199,11 +199,13 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
         if (method === 'PATCH' && cardMetadata) return json(response, 200, await workspace.update(decodeURIComponent(cardMetadata[1]), metadataPatch(data)));
         if (method === 'GET' && url.pathname === '/api/studio/tasks') return json(response, 200, { tasks: studio.list() });
         if (method === 'POST' && url.pathname === '/api/studio/tasks') return json(response, 201, await studio.create(data));
-        const studioAction = /^\/api\/studio\/tasks\/([\w-]+)\/(plan|approve|run|route)$/.exec(url.pathname);
+        const studioAction = /^\/api\/studio\/tasks\/([\w-]+)\/(plan|approve|run|route|owner-review|recover)$/.exec(url.pathname);
         if (studioAction) {
           const [, id, action] = studioAction;
           if (method === 'GET' && action === 'route') return json(response, 200, await studio.routing(id));
           if (method === 'POST' && action === 'approve') return json(response, 200, await studio.approve(id));
+          if (method === 'POST' && action === 'owner-review') return json(response, 200, await studio.ownerReview(id, data.approved));
+          if (method === 'POST' && action === 'recover') return json(response, 200, await studio.recover(id));
           if (method === 'POST' && action === 'plan') {
             void studio.plan(id).catch(() => {});
             return json(response, 202, { started: true, id, action });

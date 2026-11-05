@@ -25,9 +25,11 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
   }
   const action = async (name: string) => {
     if (!current) return
+    if (name === 'recover' && !window.confirm('Have you inspected the interrupted worktree and any paid-generation receipts? A failed step may be retried.')) return
+    if (name === 'owner-review' && !window.confirm('Confirm that you personally completed the required QA or creative review. This is not an automated QA pass.')) return
     if (name === 'run' && !window.confirm('Run this approved batch using your Codex and Claude CLI subscriptions? It may consume plan limits. No external paid generations are authorized.')) return
     setWorking(true); setError('')
-    try { await api('/studio/tasks/' + current.id + '/' + name, {}); await refresh() }
+    try { await api('/studio/tasks/' + current.id + '/' + name, name === 'owner-review' ? { approved: true } : {}); await refresh() }
     catch (e) { setError(String(e instanceof Error ? e.message : e)) }
     finally { setWorking(false) }
   }
@@ -50,6 +52,8 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
         {['draft', 'plan_failed'].includes(current.status) && <button disabled={working} onClick={() => void action('plan')}>Plan with Codex</button>}
         {current.status === 'awaiting_approval' && <button disabled={working} onClick={() => void action('approve')}>Approve plan</button>}
         {current.status === 'approved' && <button disabled={working} onClick={() => void action('run')}>Run batch</button>}
+        {current.status === 'awaiting_owner' && <button disabled={working} onClick={() => void action('owner-review')}>I completed the review · Continue</button>}
+        {current.status === 'interrupted' && <button disabled={working} onClick={() => void action('recover')}>Recover after inspection</button>}
       </div>
     </section>}
     {error && <p className="desk-error-inline" role="alert">{error}</p>}

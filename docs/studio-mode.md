@@ -35,3 +35,5 @@ This first release does NOT automatically merge feature branches, run long QA jo
 ## Skills
 
 Source skills are in .agents/skills; Claude copies are in .claude/skills. Use npm run skills:sync after changing the source skill. Relevant preexisting modules: game-ui-workflow, gameplay-visual-review, materials-to-game, image-reference-workflow, blender-game-animation, feature-handoff.
+
+An owner-review stop can be confirmed in Studio after manually completing the named QA or creative check; confirmation only records the owner's decision, not a passed automated test. Interrupted batches require manual worktree/receipt inspection before Recovery; the pending step may repeat actions.

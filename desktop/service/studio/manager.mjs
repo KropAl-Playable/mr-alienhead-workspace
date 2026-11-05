@@ -75,6 +75,24 @@ export class StudioManager {
     const decision = await this.decider.route(step);
     return { stepId: step.id, title: step.title, plannedRole: step.role, ...decision };
   }
+  async ownerReview(id, approved) {
+    const task = this.get(id);
+    if (task.status !== 'awaiting_owner' || typeof approved !== 'boolean') throw new Error('An outstanding owner review and explicit decision are required.');
+    const step = task.steps.find(s => s.state === 'awaiting_owner');
+    if (!step) throw new Error('No pending review step.');
+    step.state = approved ? 'completed' : 'failed';
+    task.status = approved ? 'approved' : 'blocked';
+    task.note = approved ? 'Owner confirmed the required external review. Continue with Run batch.' : 'Owner rejected the step. Resolve before continuing.';
+    await this.persist(); return this.publicTask(task);
+  }
+  async recover(id) {
+    const task = this.get(id);
+    if (task.status !== 'interrupted') throw new Error('Only interrupted batches can be recovered.');
+    for (const step of task.steps) if (step.state === 'running') step.state = 'pending';
+    task.status = 'approved';
+    task.note = 'Recovery approved after manual inspection. A pending step may repeat work: check paid-generation receipts before continuing.';
+    await this.persist(); return this.publicTask(task);
+  }
   async run(id) {
     const task = this.get(id);
     if (!task.approved || !['approved', 'interrupted'].includes(task.status) || this.busy.has(id)) throw new Error('Owner approval required before execution.');
