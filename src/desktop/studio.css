@@ -14,7 +14,45 @@
 .studio-actions button:disabled{opacity:.5}.studio-warning{color:#ffd39c!important}
 @media(max-width:650px){.studio-body{grid-template-columns:1fr}.studio-detail{grid-column:1}.studio-dialog{padding:15px}}
 
-.studio-launch{width:auto;min-width:55px;padding:0 9px;font-size:12px;font-weight:600;color:#e4c29a;}
-
-/* Keep the Studio entry legible even if the standard icon button is fixed-width. */
-.chats-header-actions .studio-launch{width:auto;min-width:66px;flex:0 0 auto;padding:0 9px;font-size:12px;}
+/* Studio has its own row. The Chats title bar was built for three 30px icons,
+   and adding a text button there made the branding overlap on narrow windows. */
+.studio-entry-row{
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-width:0;
+  min-height:43px;
+  padding:5px 12px;
+  flex-shrink:0;
+  border-bottom:1px solid #ffffff0d;
+  background:linear-gradient(90deg,#221b25 0%,#111117 70%);
+}
+.studio-entry-button{
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  min-height:32px;
+  min-width:114px;
+  padding:0 14px;
+  flex-shrink:0;
+  border:1px solid #e8a4b54a;
+  border-radius:8px;
+  background:#e8a4b514;
+  color:#efbfce!important;
+  font-size:12px;
+  font-weight:650;
+  letter-spacing:.15px;
+  cursor:pointer;
+}
+.studio-entry-button:hover{background:#e8a4b52b;border-color:#e8a4b58c;color:#ffe2eb!important}
+.studio-entry-button:active{background:#e8a4b53a}
+.studio-entry-glyph{color:#eaaabd;font-size:17px;line-height:1}
+.studio-entry-caption{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#9a8b9a}
+@media(max-width:400px){
+  .studio-entry-button{width:100%;flex:1;min-height:34px}
+  .studio-entry-caption{display:none}
+}
