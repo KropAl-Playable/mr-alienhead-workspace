@@ -44,7 +44,7 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
     <section className="studio-queue"><h3>Production queue</h3>
       <div className="studio-task-list">{tasks.map(t => <button key={t.id} className={current?.id === t.id ? 'chosen' : ''} onClick={() => setSelected(t.id)}><strong>{t.goal.slice(0, 84)}</strong><small>{t.status} · {t.project.split(/[\\/]/).pop()}</small></button>)}</div>
     </section>
-    {current && <section className="studio-detail"><h3>{current.status.replaceAll('_', ' ')}</h3><p>{current.summary || current.goal}</p>
+    {current && <section className="studio-detail"><h3>{current.status.replace(/_/g, ' ')}</h3><p>{current.summary || current.goal}</p>
       {current.steps.map(step => <div className="studio-step" key={step.id}><strong>{step.id}. {step.title}</strong><span>{step.decision?.role || step.role} · {step.state}</span>{step.acceptance?.length > 0 && <small>{step.acceptance.join(' · ')}</small>}</div>)}
       {current.note && <p className="studio-warning">{current.note}</p>}
       {current.worktree && <small>Worktree: {current.worktree}</small>}

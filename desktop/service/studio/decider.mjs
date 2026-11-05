@@ -28,7 +28,7 @@ export class LocalDecider {
   constructor({ endpoint = 'http://127.0.0.1:11434', model = 'qwen3.5:4b-q4_K_M', timeoutMs = 30000, fetcher = fetch } = {}) {
     const url = new URL(endpoint);
     if (!['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.protocol !== 'http:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash)
-      throw new Error('Decider must use a plain localhost Ollama endpoint.');
+      throw new Error('Decider must use a plain loopback localhost Ollama endpoint.');
     this.endpoint = url.origin;
     this.model = model;
     this.timeoutMs = timeoutMs;
