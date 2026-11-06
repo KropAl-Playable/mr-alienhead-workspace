@@ -90,6 +90,41 @@ try {
   await page.getByText('No MCP servers match these filters.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Close MCP', exact: true }).click();
   await page.goto(service.urls.chats);
+  // Regression: Studio must be independently clickable at native Chats widths.
+  // In a previous layout it overlapped the brand and three header icons.
+  for (const width of [330, 380, 535]) {
+    await page.setViewportSize({ width, height: 730 });
+    const studioButton = page.getByRole('button', { name: 'Open AI Game Studio' });
+    await studioButton.waitFor({ state: 'visible' });
+    const visibleAndUnobstructed = await page.evaluate(() => {
+      const button = document.querySelector('.studio-entry-button');
+      const brand = document.querySelector('.chats-brand');
+      const headerActions = document.querySelector('.chats-header-actions');
+      if (!(button instanceof HTMLElement) || !brand || !headerActions) return false;
+      const rect = button.getBoundingClientRect();
+      const brandRect = brand.getBoundingClientRect();
+      const actionsRect = headerActions.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return rect.width >= 100 && rect.height >= 30
+        && rect.left >= 0 && rect.right <= innerWidth
+        && hit != null && (hit === button || button.contains(hit))
+        && brandRect.right <= actionsRect.left + 1;
+    });
+    assert.ok(visibleAndUnobstructed, 'Studio entry must be hit-testable and not overlap header at ' + width + 'px');
+    await studioButton.click();
+    await page.locator('.studio-pane').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.desk-scrim').count(), 0, 'Studio must not open a modal scrim');
+    await page.getByRole('button', { name: 'Close Studio' }).click();
+    await page.locator('.studio-pane').waitFor({ state: 'detached' });
+  }
+  // On wide Chats windows, Studio must remain nonmodal: chats can still be used.
+  await page.setViewportSize({ width: 1000, height: 730 });
+  await page.getByRole('button', { name: 'Open AI Game Studio' }).click();
+  assert.equal(await page.locator('.chat-body').isVisible(), true);
+  await page.getByRole('button', { name: 'Find a chat' }).click();
+  await page.locator('.chat-switcher').waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: 'Open AI Game Studio' }).click();
+  await page.locator('.studio-pane').waitFor({ state: 'detached' });
   async function setTerminalFontSize(size) {
     await page.getByTitle('Chat options', { exact: true }).click();
     const control = page.locator('.font-control');

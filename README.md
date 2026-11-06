@@ -47,6 +47,10 @@ dictation need no Mr. Mak transcription key.
 
 [Set up mobile access and voice input](docs/mobile-access.md)
 
+## AI Game Studio (experimental)
+
+The **Studio** button in Chats opens an opt-in multi-agent workflow: Codex plans the original task, local Qwen3.5-4B GGUF proposes a route, and Codex/Claude Code workers operate in an isolated Git worktree after owner approval. Nothing auto-merges or spends external-generation credits. This is an initial integration, not an unattended studio. See [Studio Mode setup and limitations](docs/studio-mode.md).
+
 ## Everyday tools
 
 - **Your files, close at hand.** Browse a folder tree with Main folders or All

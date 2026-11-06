@@ -1,0 +1,135 @@
+/* Studio has its own row. The Chats title bar was built for three 30px icons,
+   and adding a text button there made the branding overlap on narrow windows. */
+.studio-entry-row{
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  min-width:0;
+  min-height:43px;
+  padding:5px 12px;
+  flex-shrink:0;
+  border-bottom:1px solid #ffffff0d;
+  background:linear-gradient(90deg,#221b25 0%,#111117 70%);
+}
+.studio-entry-button{
+  box-sizing:border-box;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  min-height:32px;
+  min-width:114px;
+  padding:0 14px;
+  flex-shrink:0;
+  border:1px solid #e8a4b54a;
+  border-radius:8px;
+  background:#e8a4b514;
+  color:#efbfce!important;
+  font-size:12px;
+  font-weight:650;
+  letter-spacing:.15px;
+  cursor:pointer;
+}
+.studio-entry-button:hover{background:#e8a4b52b;border-color:#e8a4b58c;color:#ffe2eb!important}
+.studio-entry-button:active{background:#e8a4b53a}
+.studio-entry-glyph{color:#eaaabd;font-size:17px;line-height:1}
+.studio-entry-caption{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#9a8b9a}
+@media(max-width:400px){
+  .studio-entry-button{width:100%;flex:1;min-height:34px}
+  .studio-entry-caption{display:none}
+}
+
+
+/* Studio is a non-modal work surface. Chats remains interactive beside it. */
+.studio-workspace{display:flex;flex:1;min-height:0;min-width:0;position:relative;overflow:hidden}
+.studio-workspace>.chat-body{flex:1 1 0;min-width:0;min-height:0}
+.studio-workspace.with-studio>.chat-body{border-right:1px solid #ffffff12}
+.studio-pane{
+  box-sizing:border-box;
+  flex:0 0 clamp(370px,57%,680px);
+  min-width:0;max-width:72%;height:100%;display:flex;flex-direction:column;
+  background:#191820;color:#e9dce0;border-left:1px solid #8b677242;
+  box-shadow:-12px 0 35px #0003;
+}
+.studio-pane-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-shrink:0;padding:16px 17px 12px;background:#211d26;border-bottom:1px solid #d59baf2b}
+.studio-pane-heading small{display:block;font-size:9px;letter-spacing:1.2px;color:#e8aabd}
+.studio-pane-heading h2{font-family:var(--font-display,Georgia,serif);font-size:24px;font-weight:600;line-height:1.1;margin:5px 0;color:#f8edf1}
+.studio-pane-heading p{font-size:11px;line-height:1.4;color:#b7a5b0;margin:0}
+.studio-pane-heading>.desk-icon{font-size:22px;min-width:30px}
+.studio-nav{display:flex;align-items:stretch;gap:2px;flex-shrink:0;padding:7px 10px;background:#1a171e;border-bottom:1px solid #ffffff14}
+.studio-nav button{position:relative;flex:1;min-height:34px;padding:7px 4px;border:0;border-radius:7px;background:transparent;color:#aaa2b0!important;font-size:11px;font-weight:600;white-space:nowrap}
+.studio-nav button.active{background:#e6a5b61c;color:#f3bdcc!important}
+.studio-nav button:hover{background:#ffffff0a;color:#f6d4e0!important}
+.studio-nav i{display:inline-block;width:6px;height:6px;margin:0 0 1px 5px;background:#8ee0c6;border-radius:50%;box-shadow:0 0 7px #8ee0c6}
+.studio-pane-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:15px 17px 24px;scrollbar-width:thin}
+.studio-pane-scroll>h3{font-size:14px;margin:14px 0 9px;color:#f2d6da}
+.studio-pane-scroll h4{margin:17px 0 7px;color:#eccbd6}
+.studio-pane-scroll p{font-size:12px;line-height:1.55;color:#cebec7;overflow-wrap:anywhere}
+.studio-create{background:#24202a;border:1px solid #9d75803e;border-radius:10px;padding:10px 12px;margin-bottom:15px}
+.studio-create>summary{cursor:pointer;color:#e7afc3;font-weight:650;font-size:12px}
+.studio-create label{display:block;font-size:11px;color:#dbc1ca;margin-top:11px}
+.studio-create input,.studio-create textarea{display:block;box-sizing:border-box;width:100%;border:1px solid #5d505e;background:#302a33;color:#f8edf3;border-radius:8px;padding:9px;margin:6px 0 9px;resize:vertical;font:inherit;font-size:12px}
+.studio-action-primary,.studio-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:34px;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:650;cursor:pointer}
+.studio-action-primary{background:#e8a4b5;border:1px solid #efaebe;color:#2e1a25!important}
+.studio-action-primary:hover{background:#f1b8c7}
+.studio-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.studio-actions button{background:#382d38;color:#f3cedb!important;border:1px solid #b5889966}
+.studio-actions button:hover{background:#4c3646}
+.studio-actions button:disabled,.studio-action-primary:disabled{opacity:.5;cursor:default}
+.studio-task-list{display:grid;gap:7px;max-height:215px;overflow-y:auto;padding-right:3px;scrollbar-width:thin}
+.studio-task-list button{box-sizing:border-box;width:100%;text-align:left;border-radius:9px;border:1px solid #655463;background:#242029;color:#e5d8e0;padding:10px 12px;cursor:pointer}
+.studio-task-list button.chosen{border-color:#e7acc3;background:#392c38}
+.studio-task-list strong{display:block;font-size:12px;line-height:1.35}
+.studio-task-list small{display:block;color:#afa0aa;font-size:10px;margin-top:6px}
+.studio-task-detail{margin-top:18px;padding-top:14px;border-top:1px solid #7665754a}
+.studio-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.studio-task-heading h3{margin:0;font-size:17px;color:#f3d5de;overflow-wrap:anywhere}
+.studio-task-heading span{font-size:11px;color:#b7a3af;flex-shrink:0}
+.studio-running-indicator,.studio-live-summary p{display:flex;align-items:center;gap:7px;font-size:11px;color:#ebbdcd}
+.studio-pulse{display:inline-block;flex-shrink:0;width:8px;height:8px;border-radius:50%;background:#8ee0c6;box-shadow:0 0 9px #8ee0c6aa;animation:studio-glow 1.6s infinite alternate}
+@keyframes studio-glow{from{opacity:.5}to{opacity:1}}
+.studio-step{display:block;margin:8px 0;padding:9px 11px;border:1px solid #60515c;border-radius:9px;background:#26222b}
+.studio-step>summary{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;cursor:pointer;list-style:none}
+.studio-step>summary::-webkit-details-marker{display:none}
+.studio-step>summary strong{font-size:12px;line-height:1.45;color:#f0d9e0;flex:1;min-width:0;overflow-wrap:anywhere}
+.studio-step>summary small{font-size:10px;line-height:1.4;color:#be9eac;flex:0 0 auto;max-width:38%;text-align:right}
+.studio-step.studio-state-running{border-color:#8ee0c6a0}
+.studio-step.studio-state-failed{border-color:#ee9b9b9a}
+.studio-step p{margin:7px 0;font-size:11px}
+.studio-note{border-left:3px solid #d5a1b4;padding:8px 10px;background:#e8a4b50d}
+.studio-path{font-size:10px!important;overflow-wrap:anywhere}
+.studio-path code{font-size:10px;color:#e5bed0}
+.studio-muted{font-size:11px!important;color:#a6a0aa!important}
+.studio-live-summary{padding:12px;background:#27222c;border:1px solid #b3809654;border-radius:10px}
+.studio-live-summary p{margin-bottom:0;line-height:1.4}
+.studio-activity-feed{display:flex;flex-direction:column;gap:7px;margin-top:12px;min-height:250px;max-height:calc(100dvh - 330px);overflow-y:auto;border:1px solid #ffffff12;border-radius:9px;background:#111116;padding:11px}
+.studio-event{display:grid;grid-template-columns:60px 1fr auto;gap:6px;align-items:start;padding:6px 1px;border-bottom:1px solid #ffffff09;font:11px/1.5 var(--font-body,Arial,sans-serif);overflow-wrap:anywhere}
+.studio-event time{color:#89828e;font-variant-numeric:tabular-nums}
+.studio-event span{color:#cec2ce}.studio-event small{color:#867a88}
+.studio-event-error span{color:#e99e9e}.studio-event-milestone span{color:#a3e1cc}
+.studio-event-tool span{color:#b4acd6}.studio-event-review span{color:#e9c08f}
+.studio-artifact-list{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.studio-artifact-list button{display:flex;align-items:center;gap:8px;min-height:31px;text-align:left;background:#25212c;border:1px solid #665364;border-radius:7px;color:#e0cbd7!important;font-size:11px;padding:6px 9px;overflow-wrap:anywhere}
+.studio-artifact-list button.active{background:#42303d;border-color:#dda8be}
+.studio-artifact-list button small{margin-left:auto;white-space:nowrap;color:#b49cac}
+.studio-markdown{margin-top:15px;border:1px solid #70606f;background:#25202a;border-radius:10px;padding:12px 14px;overflow:auto;font-size:12px;line-height:1.6}
+.studio-markdown h1,.studio-markdown h2,.studio-markdown h3{color:#f1d2dd;line-height:1.3}
+.studio-markdown pre,.studio-worker-report,.studio-transcript pre{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#151319;padding:10px;border-radius:6px;font-size:11px}
+.studio-markdown code{overflow-wrap:anywhere}
+.studio-markdown table{display:block;max-width:100%;overflow:auto;border-collapse:collapse}
+.studio-markdown th,.studio-markdown td{border:1px solid #6a5864;padding:6px}
+.studio-markdown img{max-width:100%}
+.studio-image-preview{margin:12px 0}.studio-image-preview img{max-width:100%;max-height:480px;border-radius:10px;object-fit:contain}
+.studio-image-preview figcaption{font-size:11px;color:#aca1b0;overflow-wrap:anywhere}
+.studio-transcript{margin-top:9px;font-size:11px}.studio-transcript>summary{cursor:pointer;color:#cda8ba}
+@media(max-width:760px){
+  .studio-workspace.with-studio>.chat-body{display:none}
+  .studio-pane{flex:1 1 auto;width:100%;max-width:100%;border-left:0}
+}
+@media(max-width:400px){
+  .studio-pane-heading{padding:12px}
+  .studio-pane-scroll{padding:12px}
+}
+@media(prefers-reduced-motion:reduce){.studio-pulse{animation:none}}
