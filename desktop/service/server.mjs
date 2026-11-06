@@ -200,6 +200,12 @@ export async function createService({ repo, uiDir, stateDir, token = secret(), n
         const cardMetadata = url.pathname.match(/^\/api\/workspace\/entities\/([^/]+)$/);
         if (method === 'PATCH' && cardMetadata) return json(response, 200, await workspace.update(decodeURIComponent(cardMetadata[1]), metadataPatch(data)));
         if (method === 'GET' && url.pathname === '/api/studio/tasks') return json(response, 200, { tasks: studio.list() });
+        const studioFiles = /^\/api\/studio\/tasks\/([\w-]+)\/(artifacts|preview)$/.exec(url.pathname);
+        if (studioFiles && method === 'GET') {
+          const [, id, action] = studioFiles;
+          if (action === 'artifacts') return json(response, 200, { files: await studio.listArtifacts(id) });
+          return json(response, 200, await studio.previewArtifact(id, url.searchParams.get('path') || ''));
+        }
         if (method === 'POST' && url.pathname === '/api/studio/tasks') return json(response, 201, await studio.create(data));
         const studioAction = /^\/api\/studio\/tasks\/([\w-]+)\/(plan|approve|run|route|owner-review|recover|retry-setup)$/.exec(url.pathname);
         if (studioAction) {

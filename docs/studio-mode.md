@@ -95,3 +95,30 @@ The new build:
 **Recovery procedure:** update and reinstall the desktop app, quit the older version completely, open Studio, select the original blocked task, check for any active Git checkout process or partial checkout in `.mrmak/studio/worktrees/<task-id>`, and click **Retry worktree setup**. If Git reports an orphan branch or an incomplete checkout, stop and inspect it; do not force-remove the branch or folder automatically.
 
 The first planned QA stage still requires manual owner confirmation in this MVP. Studio does not claim automated game testing for that stage.
+
+
+## Studio UX: non-modal workspace, Live activity and Results
+
+Studio is an **embedded dock** in the Chats window, not a blocking modal. In a wide window, the active CLI chat remains interactive to the left and Studio uses the right side. In narrow windows, Studio uses the content area but the header/tab controls remain accessible; clicking a chat tab returns to Chats. Click the Studio button again to toggle the dock.
+
+Studio has three views:
+- **Tasks**: production queue, plan progress, step-level state, run/recover permissions.
+- **Live activity**: current owner/phase and a bounded timeline of *sanitized* Codex/Claude event summaries. The runner reads Codex \`exec --json\` and Claude \`-p --verbose --output-format stream-json\`. It does not render private reasoning, raw tool inputs or environment secrets. This is a lightweight activity feed, **not** an embedded PTY or a replay of complete terminal output.
+- **Results**: Markdown and image files actually changed in the isolated Git worktree, plus final worker prose and per-step summaries. Files are previewed read-only, with path restrictions and size limits. Both uncommitted changes and files committed on the Studio branch are eligible. No user-visible "completed" label implies artistic acceptance.
+
+### Restart / crash recovery
+
+The queue is persisted in \`.mrmak/studio/tasks.json\`. On restart:
+- \`planning\` becomes \`plan_interrupted\`; use **Plan with Codex** again.
+- \`running\` becomes \`interrupted\`; click **Inspect & recover** only *after* inspecting partial files, connected service accounts and any paid-generation receipts.
+- A blocked worker with failed steps can also be recovered explicitly. Only unfinished steps are queued for replay; completed steps are preserved.
+- A historical \`approved\` task whose steps are all \`completed\` automatically becomes \`awaiting_review\` with a **View results** action. Do not click Run batch for a finished review package.
+- A task waiting for an owner QA decision stays \`awaiting_owner\` after restart.
+
+Recovery **does not restore the exact Codex/Claude in-memory conversation**. It safely replays the incomplete instruction in the existing worktree. Never assume a task replay cannot create duplicate paid jobs: this MVP still prohibits external paid generation without separate owner approval.
+
+### How to review Objective #001
+
+Open Studio → select Objective #001 → **Results**. Read the changed Markdown reports individually. The output from Codex/Claude appears in expandable step summaries, and the audit log appears in Live activity (recent tasks only). If older tasks have no saved event history, the new runner cannot reconstruct past activity; the existing generated files remain in the worktree shown in the task details.
+
+If a report is not listed, copy the displayed worktree path and inspect the file directly. The artifact index is deliberately limited to changed \`.md\`, \`.txt\`, \`.json\` and image files, and will not scan/serve arbitrary repository files.

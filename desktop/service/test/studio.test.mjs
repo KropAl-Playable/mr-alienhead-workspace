@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { LocalDecider, parseDecision, deterministicRoute } from '../studio/decider.mjs';
 import { StudioManager, validatePlan } from '../studio/manager.mjs';
+import { StudioArtifacts } from '../studio/artifacts.mjs';
+import { workerEvent, workerReport } from '../studio/runner.mjs';
 
 test('Qwen GGUF router uses local Ollama chat with strict JSON schema', async () => {
   let captured;
@@ -93,8 +95,7 @@ test('QA step pauses until the owner confirms the external check', async () => {
     assert.equal(manager.get(task.id).status, 'awaiting_owner');
     await assert.rejects(manager.ownerReview(task.id, 'yes'), /explicit/);
     await manager.ownerReview(task.id, true);
-    assert.equal(manager.get(task.id).status, 'approved');
-    await manager.run(task.id);
+    assert.equal(manager.get(task.id).status, 'awaiting_review');
     assert.equal(manager.get(task.id).status, 'awaiting_review');
   } finally { await rm(root, { recursive: true, force: true }); }
 });
@@ -188,4 +189,89 @@ test('worker exception is reported as failed, not left permanently running', asy
     assert.equal(manager.get(task.id).phase, 'worker_failed');
     await assert.rejects(manager.retrySetup(task.id), /Only blocked worktree setup/);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('CLI events expose useful progress without exposing thinking or tool arguments', () => {
+  assert.deepEqual(workerEvent('{"type":"thread.started"}', 'codex'), { kind: 'session', message: 'Codex session started' });
+  assert.deepEqual(workerEvent(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'Menu audit ready' } }), 'codex'),
+    { kind: 'message', message: 'Menu audit ready' });
+  assert.equal(workerEvent(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'thinking', thinking: 'private chain' }] } }), 'claude'), null);
+  assert.deepEqual(workerEvent(JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Read', input: { path: 'private-file' } }] } }), 'claude'),
+    { kind: 'tool', message: 'Claude is using Read' });
+  assert.equal(workerEvent('not-json', 'codex'), null);
+});
+test('old approved finished batch migrates into result review, not another Run button', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-migrate-'));
+  const stateDir = path.join(root, '.mrmak');
+  await mkdir(path.join(stateDir, 'studio'), { recursive: true });
+  try {
+    await writeFile(path.join(stateDir, 'studio', 'tasks.json'), JSON.stringify([{
+      id: 'finished-1', project: root, goal: 'Old objective', status: 'approved', approved: true,
+      steps: [{ id: 1, title: 'Audit', role: 'claude', prompt: 'audit', state: 'completed' }],
+      events: [], summary: 'Complete', createdAt: new Date().toISOString()
+    }]));
+    const manager = await new StudioManager({ repo: root, stateDir }).init();
+    assert.equal(manager.get('finished-1').status, 'awaiting_review');
+    await assert.rejects(manager.run('finished-1'), /approval/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+test('restarting a running Studio task marks it interrupted and owner may replay only unfinished step', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-resume-'));
+  await mkdir(path.join(root, '.git'));
+  const opts = {
+    repo: root, stateDir: root,
+    planner: async () => ({ summary: 'test', steps: [
+      { title: 'Code', role: 'codex', prompt: 'Code first' },
+      { title: 'Art', role: 'claude', prompt: 'Make art' }
+    ] }),
+    decider: { route: async step => ({ role: step.role, source: 'fixture' }) },
+    command: async () => ({ code: 0, stdout: '', stderr: '' }),
+    worker: async () => ({ code: 0, stdout: 'Done', stderr: '' })
+  };
+  try {
+    const manager = await new StudioManager(opts).init();
+    const created = await manager.create({ project: root, goal: 'Work safely' });
+    await manager.plan(created.id); await manager.approve(created.id);
+    const task = manager.get(created.id);
+    task.status = 'running';
+    task.steps[0].state = 'completed'; task.steps[1].state = 'running';
+    await manager.persist();
+    const restarted = await new StudioManager(opts).init();
+    assert.equal(restarted.get(created.id).status, 'interrupted');
+    await restarted.recover(created.id);
+    assert.equal(restarted.get(created.id).status, 'approved');
+    assert.equal(restarted.get(created.id).steps[0].state, 'completed');
+    assert.equal(restarted.get(created.id).steps[1].state, 'pending');
+    await restarted.run(created.id);
+    assert.equal(restarted.get(created.id).status, 'awaiting_review');
+    assert.equal(restarted.get(created.id).steps[0].state, 'completed');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+test('changed artifact previews are bounded and traversal is rejected', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-artifacts-'));
+  await mkdir(path.join(root, 'reports'));
+  await writeFile(path.join(root, 'reports', 'audit.md'), '# Visual audit\nReal results');
+  const artifacts = new StudioArtifacts({ command: async () => ({
+    code: 0, stdout: '?? reports/audit.md\0', stderr: ''
+  }) });
+  const task = { worktree: root };
+  try {
+    const files = await artifacts.list(task);
+    assert.equal(files.length, 1);
+    assert.equal(files[0].path, 'reports/audit.md');
+    const preview = await artifacts.preview(task, 'reports/audit.md');
+    assert.match(preview.text, /Real results/);
+    await assert.rejects(artifacts.preview(task, '../private.md'), /Invalid artifact path/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('worker reports extract final prose instead of dumping raw JSONL tool arguments', () => {
+  const codex = [
+    JSON.stringify({ type: 'item.completed', item: { type: 'command_execution', command: 'secret' } }),
+    JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'Audit was completed; review three Markdown reports.' } })
+  ].join('\n');
+  assert.match(workerReport(codex, 'codex'), /three Markdown reports/);
+  assert.doesNotMatch(workerReport(codex, 'codex'), /secret/);
+  const claude = JSON.stringify({ type: 'result', result: 'Visual direction requires warm key lighting.' });
+  assert.match(workerReport(claude, 'claude'), /warm key lighting/);
 });

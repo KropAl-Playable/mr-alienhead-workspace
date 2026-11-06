@@ -112,10 +112,19 @@ try {
     });
     assert.ok(visibleAndUnobstructed, 'Studio entry must be hit-testable and not overlap header at ' + width + 'px');
     await studioButton.click();
-    await page.locator('.studio-dialog').waitFor({ state: 'visible' });
+    await page.locator('.studio-pane').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.desk-scrim').count(), 0, 'Studio must not open a modal scrim');
     await page.getByRole('button', { name: 'Close Studio' }).click();
-    await page.locator('.studio-dialog').waitFor({ state: 'detached' });
+    await page.locator('.studio-pane').waitFor({ state: 'detached' });
   }
+  // On wide Chats windows, Studio must remain nonmodal: chats can still be used.
+  await page.setViewportSize({ width: 1000, height: 730 });
+  await page.getByRole('button', { name: 'Open AI Game Studio' }).click();
+  assert.equal(await page.locator('.chat-body').isVisible(), true);
+  await page.getByRole('button', { name: 'Find a chat' }).click();
+  await page.locator('.chat-switcher').waitFor({ state: 'visible' });
+  await page.getByRole('button', { name: 'Open AI Game Studio' }).click();
+  await page.locator('.studio-pane').waitFor({ state: 'detached' });
   async function setTerminalFontSize(size) {
     await page.getByTitle('Chat options', { exact: true }).click();
     const control = page.locator('.font-control');
