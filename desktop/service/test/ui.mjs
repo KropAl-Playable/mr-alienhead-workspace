@@ -125,6 +125,7 @@ try {
   await page.locator('.chat-switcher').waitFor({ state: 'visible' });
   await page.getByRole('button', { name: 'Open AI Game Studio' }).click();
   await page.locator('.studio-pane').waitFor({ state: 'detached' });
+  await page.keyboard.press('Escape'); // Close the chat switcher opened above.
   async function setTerminalFontSize(size) {
     await page.getByTitle('Chat options', { exact: true }).click();
     const control = page.locator('.font-control');
