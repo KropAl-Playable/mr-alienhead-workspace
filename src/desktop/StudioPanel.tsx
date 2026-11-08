@@ -10,9 +10,14 @@ type StudioStep = {
   decision?: { role: string; source: string }; acceptance: string[];
   startedAt?: string; finishedAt?: string; exitCode?: number
 }
+type StudioPolicy = {
+  mode: 'guarded' | 'autonomous'
+  tools: { playwright: boolean; blender: boolean; tripo: boolean; imagegen: boolean }
+  tripoCreditCap: number; autoResume: boolean; maxRateLimitRetries: number
+}
 type StudioTask = {
   id: string; project: string; goal: string; status: string; phase?: string | null;
-  summary: string; approved: boolean; note?: string; worktree?: string;
+  summary: string; approved: boolean; note?: string; worktree?: string; policy?: StudioPolicy; retryAt?: string | null;
   steps: StudioStep[]; events?: StudioEvent[]
 }
 type Artifact = { path: string; kind: 'text' | 'image'; size: number }
@@ -26,6 +31,10 @@ const date = (value: string) => {
 export default function StudioPanel({ close, projectFolder }: { close: () => void; projectFolder: string }) {
   const [project, setProject] = useState(projectFolder)
   const [goal, setGoal] = useState('')
+  const [autonomous, setAutonomous] = useState(false)
+  const [autonomousAuthorized, setAutonomousAuthorized] = useState(false)
+  const [tools, setTools] = useState({ playwright: true, blender: true, tripo: true, imagegen: true })
+  const [tripoCredits, setTripoCredits] = useState(500)
   const [tasks, setTasks] = useState<StudioTask[]>([])
   const [selected, setSelected] = useState('')
   const [view, setView] = useState<Section>('queue')
@@ -66,7 +75,12 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
   const create = async () => {
     setWorking(true); setError('')
     try {
-      const task = await api<StudioTask>('/studio/tasks', { project, goal })
+      const policy = autonomous ? {
+        mode: 'autonomous', ownerAuthorized: autonomousAuthorized, tools,
+        tripoCreditCap: tools.tripo ? tripoCredits : 0, tripoAttemptsPerAsset: 2,
+        autoResume: true, maxRateLimitRetries: 3, retryDelayMinutes: 30,
+      } : { mode: 'guarded' }
+      const task = await api<StudioTask>('/studio/tasks', { project, goal, policy })
       setSelected(task.id); setGoal(''); setView('queue'); await refresh()
     } catch (e) { setError(String(e instanceof Error ? e.message : e)) }
     finally { setWorking(false) }
@@ -79,8 +93,9 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
       'Check for an unfinished Git checkout and active Git processes first. Retry worktree setup?')) return
     if (name === 'owner-review' && !window.confirm(
       'Confirm that you PERSONALLY completed this QA/creative review. This button does not run tests.')) return
+    if (name === 'approve' && current.policy?.mode === 'autonomous' && !window.confirm('Approve autonomous operation for this task? Claude Auto and Codex sandbox-write will execute approved tools, including Tripo up to the stated CREDIT POLICY. Important: third-party browser credits are NOT programmatically enforced.')) return
     if (name === 'run' && !window.confirm(
-      'Run approved steps via Codex and Claude CLI subscriptions? This consumes plan limits. External paid generation remains prohibited.')) return
+      current.policy?.mode === 'autonomous' ? 'Start AUTONOMOUS Studio batch with approved creative web tools and Claude Auto? Tripo credit rules are policy-only, not a browser-enforced cap.' : 'Run guarded batch via Codex/Claude CLI subscriptions? External paid generation is not permitted.')) return
     setWorking(true); setError('')
     try {
       await api('/studio/tasks/' + current.id + '/' + name, name === 'owner-review' ? { approved: true } : {})
@@ -110,7 +125,7 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
     <nav className="studio-nav" aria-label="Studio sections">
       {([['queue', 'Tasks'], ['activity', 'Live activity'], ['results', 'Results']] as const).map(([key, title]) =>
         <button key={key} type="button" className={view === key ? 'active' : ''} onClick={() => setView(key)}>
-          {title}{key === 'activity' && current?.status === 'running' && <i aria-label="Running" />}
+          {title}{key === 'activity' && ['running','waiting_for_limit_reset'].includes(current?.status || '') && <i aria-label="Running or waiting for limits" />}
         </button>)}
     </nav>
     <div className="studio-pane-scroll">
@@ -118,7 +133,26 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
         <details className="studio-create"><summary>+ New objective</summary>
           <label>Game repository (absolute path)<input value={project} spellCheck={false} onChange={e => setProject(e.target.value)} /></label>
           <label>Production objective<textarea rows={3} value={goal} placeholder="Describe a production goal…" onChange={e => setGoal(e.target.value)} /></label>
-          <button className="studio-action-primary" disabled={working || !project.trim() || !goal.trim()} onClick={() => void create()}>Create Studio task</button>
+          <div className="studio-policy-box">
+            <label className="studio-policy-toggle"><input type="checkbox" checked={autonomous} onChange={e => { setAutonomous(e.target.checked); setAutonomousAuthorized(false) }} />
+              <strong>Autonomous production</strong> <small>Claude Auto + Codex sandbox-write; approve the batch once</small>
+            </label>
+            {autonomous && <div className="studio-policy-details">
+              <p>Allowed creative tools for THIS objective:</p>
+              {(['playwright', 'blender', 'tripo', 'imagegen'] as const).map(tool =>
+                <label className="studio-policy-tool" key={tool}>
+                  <input type="checkbox" checked={tools[tool]} onChange={e => setTools(v => ({ ...v, [tool]: e.target.checked }))} />
+                  {tool === 'playwright' ? 'Playwright Extension MCP (existing authenticated sessions)' : tool === 'imagegen' ? 'ImageGen / chatgpt.com' : tool === 'blender' ? 'Blender' : 'Tripo Studio'}
+                </label>)}
+              {tools.tripo && <label>Maximum Tripo credits authorized for this batch
+                <input type="number" min={100} max={1500} step={100} value={tripoCredits} onChange={e => setTripoCredits(Number(e.target.value))} />
+              </label>}
+              <p className="studio-policy-warning">Browser submissions are NOT technically metered by Studio. The cap is enforced through agent instructions and a job ledger, not by intercepting Tripo charges. Two generations per asset brief; stop if credits or receipts are unclear. No account creation, purchases, publishing or bypassing provider protections.</p>
+              <label className="studio-policy-consent"><input type="checkbox" checked={autonomousAuthorized} onChange={e => setAutonomousAuthorized(e.target.checked)} />
+                I authorize these services and limits for this Studio objective. Automatic retries after rate limits are enabled (up to 3 per step, 30-minute cooldown).</label>
+            </div>}
+          </div>
+          <button className="studio-action-primary" disabled={working || !project.trim() || !goal.trim() || (autonomous && (!autonomousAuthorized || (tools.tripo && !(tripoCredits >= 100 && tripoCredits <= 1500))))} onClick={() => void create()}>Create Studio task</button>
         </details>
         <h3>Production queue</h3>
         <div className="studio-task-list">{tasks.map(task =>
@@ -132,6 +166,8 @@ export default function StudioPanel({ close, projectFolder }: { close: () => voi
           <div className="studio-task-heading"><h3>{label(current.status)}</h3><span>{completed}/{current.steps.length} steps</span></div>
           {current.phase && <div className="studio-running-indicator"><span className="studio-pulse" />{label(current.phase)}</div>}
           <p>{current.summary || current.goal}</p>
+          {current.policy?.mode === 'autonomous' && <p className="studio-autonomy-badge">● AUTONOMOUS · {Object.keys(current.policy.tools || {}).filter(key => current.policy?.tools[key as keyof StudioPolicy['tools']]).join(', ')} · Tripo {current.policy.tripoCreditCap} credits (policy limit)</p>}
+          {current.status === 'waiting_for_limit_reset' && <p className="studio-note">Usage limit detected. Studio will retry the unfinished step after {current.retryAt ? new Date(current.retryAt).toLocaleString() : 'the cooldown'} when Mr. Mak is running. No other completed steps will be repeated.</p>
           {current.steps.map(step => <details className={'studio-step studio-state-' + step.state} key={step.id}>
             <summary><strong>{step.id}. {step.title}</strong><small>{step.decision?.role || step.role} · {step.state === 'completed' ? 'finished, unreviewed' : label(step.state)}</small></summary>
             {step.acceptance?.length > 0 && <p>Acceptance: {step.acceptance.join(' · ')}</p>}

@@ -2,7 +2,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { mkdir, realpath, stat } from 'node:fs/promises';
 import { readJson, saveJson } from '../util.mjs';
-import { runCommand, runCodexPlan, runWorker, workerReport } from './runner.mjs';
+import { runCommand, runCodexPlan, runWorker, workerReport, detectUsageLimit } from './runner.mjs';
+import { guardedPolicy, validateStudioPolicy, isAutonomous, policyBrief } from './policy.mjs';
 import { LocalDecider } from './decider.mjs';
 import { StudioArtifacts } from './artifacts.mjs';
 
@@ -38,7 +39,7 @@ export class StudioManager {
     this.file = path.join(this.dir, 'tasks.json');
     this.planner = planner; this.worker = worker; this.command = command;
     this.decider = decider; this.artifacts = artifacts;
-    this.tasks = []; this.busy = new Set(); this.eventTimers = new Map();
+    this.tasks = []; this.busy = new Set(); this.eventTimers = new Map(); this.retryTimers = new Map();
     this.saving = Promise.resolve();
   }
   async init() {
@@ -47,6 +48,8 @@ export class StudioManager {
     if (!Array.isArray(this.tasks)) this.tasks = [];
     for (const task of this.tasks) {
       task.events ||= [];
+      task.policy ||= guardedPolicy();
+      if (task.status === 'waiting_for_limit_reset') this.scheduleRetry(task);
       if (task.status === 'planning') {
         task.status = 'plan_interrupted';
         task.note = 'Planning was interrupted by restart. You may safely re-run Codex planning.';
@@ -98,7 +101,7 @@ export class StudioManager {
   async listArtifacts(id) { return this.artifacts.list(this.get(id)); }
   async previewArtifact(id, name) { return this.artifacts.preview(this.get(id), name); }
 
-  async create({ project, goal }) {
+  async create({ project, goal, policy }) {
     if (!validText(goal)) throw new Error('A specific game-development goal is required.');
     if (typeof project !== 'string' || !path.isAbsolute(project)) throw new Error('Choose an absolute project folder.');
     const root = await realpath(project);
@@ -107,6 +110,7 @@ export class StudioManager {
     const task = {
       id: randomUUID(), project: root, goal: goal.trim(), status: 'draft',
       createdAt: new Date().toISOString(), steps: [], events: [],
+      policy: validateStudioPolicy(policy),
       summary: '', approved: false,
     };
     this.tasks.push(task); await this.persist(); return this.publicTask(task);
@@ -120,7 +124,7 @@ export class StudioManager {
     await this.persist();
     try {
       const parsed = validatePlan(await this.planner({
-        project: task.project, goal: task.goal,
+        project: task.project, goal: task.goal, policy: task.policy,
         onEvent: info => this.event(task, info.kind, info.message),
       }));
       task.steps = parsed.steps; task.summary = parsed.summary;
@@ -138,6 +142,7 @@ export class StudioManager {
     const task = this.get(id);
     if (task.status !== 'awaiting_approval') throw new Error('Only a reviewed plan can be approved.');
     task.approved = true; task.status = 'approved';
+    this.event(task, 'milestone', isAutonomous(task.policy) ? 'Owner approved AUTONOMOUS tools and Tripo credit envelope.' : 'Guarded mode enabled.');
     this.event(task, 'milestone', 'Owner approved production plan.');
     await this.flushEvents(task); return this.publicTask(task);
   }
@@ -167,10 +172,47 @@ export class StudioManager {
       approved ? 'Owner confirmed the external review step.' : 'Owner declined external review.', step.id);
     await this.flushEvents(task); return this.publicTask(task);
   }
+  scheduleRetry(task) {
+    this.clearRetry(task.id);
+    if (task.status !== 'waiting_for_limit_reset' || !task.approved
+      || !isAutonomous(task.policy) || task.policy.autoResume !== true || !task.retryAt) return;
+    const due = Date.parse(task.retryAt);
+    if (!Number.isFinite(due)) return;
+    const delay = Math.max(1000, Math.min(2147483647, due - Date.now()));
+    this.retryTimers.set(task.id, setTimeout(() => {
+      this.retryTimers.delete(task.id);
+      void this.resumeAfterLimit(task.id).catch(error => {
+        this.event(task, 'error', 'Automatic limit recovery failed: ' + String(error.message || error));
+        void this.flushEvents(task);
+      });
+    }, delay));
+  }
+  clearRetry(id) {
+    const timer = this.retryTimers.get(id);
+    if (timer) clearTimeout(timer);
+    this.retryTimers.delete(id);
+  }
+  async resumeAfterLimit(id) {
+    const task = this.get(id);
+    if (this.busy.has(id) || task.status !== 'waiting_for_limit_reset'
+      || !isAutonomous(task.policy) || task.policy.autoResume !== true) return;
+    if (!Number.isFinite(Date.parse(task.retryAt)) || Date.now() < Date.parse(task.retryAt)) {
+      this.scheduleRetry(task); return;
+    }
+    const step = task.steps.find(s => s.state === 'waiting_limit');
+    if (!step) throw new Error('No waiting step to recover.');
+    step.state = 'pending'; task.retryAt = null; task.status = 'approved'; task.phase = 'resuming_after_limit';
+    task.note = 'Limit-recovery retry started. Inspect external job receipts before any new paid submission.';
+    this.event(task, 'milestone', 'Subscription limit cooldown finished; resuming the incomplete step.');
+    await this.flushEvents(task);
+    // The existing worktree is retained, and completed steps are not replayed.
+    await this.run(id);
+  }
   async recover(id) {
     const task = this.get(id);
-    if (this.busy.has(id) || !task.approved || !['interrupted', 'blocked'].includes(task.status))
+    if (this.busy.has(id) || !task.approved || !['interrupted', 'blocked', 'waiting_for_limit_reset'].includes(task.status))
       throw new Error('Only interrupted or failed approved batches can be recovered.');
+    this.clearRetry(id);
     const incomplete = task.steps.filter(s => s.state !== 'completed');
     if (!incomplete.length) {
       task.status = 'awaiting_review'; task.phase = null;
@@ -178,7 +220,8 @@ export class StudioManager {
       this.event(task, 'milestone', 'Recovered finished batch for review; nothing was rerun.');
     } else {
       // Replay is explicit, not restoration of a previous CLI session.
-      for (const s of incomplete) if (['running', 'failed'].includes(s.state)) s.state = 'pending';
+      for (const s of incomplete) if (['running', 'failed', 'waiting_limit'].includes(s.state)) s.state = 'pending';
+      task.retryAt = null;
       task.status = 'approved'; task.phase = null;
       task.note = 'Recovered to approved. Inspect partial files and paid-generation receipts before Run batch. The interrupted step will be replayed.';
       this.event(task, 'warning', 'Owner requested safe replay. No CLI process launched by recovery.');
@@ -262,14 +305,29 @@ export class StudioManager {
         const brief = ['Studio step ' + step.id + ': ' + step.title,
           'Project goal: ' + task.goal, 'Your specialty: ' + role,
           step.prompt, 'Acceptance: ' + step.acceptance.join('; '),
-          'Other agents may have edited this worktree. Preserve their accepted changes.'].join('\n\n');
+          'Other agents may have edited this worktree. Preserve their accepted changes.',
+          policyBrief(task.policy),
+          'Codex: pass Claude concrete Playwright Extension MCP connection instructions/paths; Claude: validate MCP available before relying on it.'].join('\n\n');
         const result = await this.worker({
           role, cwd: task.worktree, prompt: brief,
           onEvent: info => this.event(task, info.kind, info.message, step.id),
+          policy: task.policy,
         });
         step.exitCode = result.code;
         step.report = workerReport(result.stdout, role) || String(result.stderr || '').slice(-2000);
         step.finishedAt = new Date().toISOString();
+        if (result.code !== 0 && isAutonomous(task.policy) && task.policy.autoResume
+          && detectUsageLimit(result) && (step.rateLimitRetries || 0) < task.policy.maxRateLimitRetries) {
+          step.rateLimitRetries = (step.rateLimitRetries || 0) + 1;
+          step.state = 'waiting_limit'; task.status = 'waiting_for_limit_reset';
+          task.phase = 'limit_cooldown';
+          task.retryAt = new Date(Date.now() + task.policy.retryDelayMinutes * 60000).toISOString();
+          task.note = 'CLI usage limit detected; automatic retry #' + step.rateLimitRetries
+            + ' scheduled for ' + task.retryAt + '. This will replay only the unfinished step.';
+          this.event(task, 'warning', task.note, step.id);
+          this.scheduleRetry(task);
+          await this.flushEvents(task); return this.publicTask(task);
+        }
         if (result.code !== 0) {
           step.state = 'failed'; task.status = 'blocked';
           this.event(task, 'error', role + ' exited with code ' + result.code, step.id);

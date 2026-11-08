@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { codexBinary, commandPath, wrapCommand } from '../agents.mjs';
+import { isAutonomous, policyBrief } from './policy.mjs';
 
 // Do not expose thinking, tool arguments, shell output, secrets, or entire prompts
 // in Studio's activity panel. Only stable, short presentation events are stored.
@@ -57,6 +58,13 @@ export function workerReport(stdout, role) {
   }
   return latest.slice(-8000);
 }
+export function detectUsageLimit(result) {
+  if (result?.code === 0) return false;
+  const output = String(result?.stderr || '') + '\n' + String(result?.stdout || '');
+  // Only classify an explicit subscription/API quota signal, not an ordinary
+  // transient command/tool error. Never auto-replay unknown external actions.
+  return /(?:rate[ -]?limit|usage[ -]?limit|quota exceeded|too many requests|you(?:'ve| have)? hit (?:your |the )?limit|resets? (?:at|in)|limit reached|429 Too Many Requests)/i.test(output);
+}
 export async function runCommand(file, args, {
   cwd, input = '', timeoutMs = 30 * 60 * 1000, phase = 'Worker',
   spawnFn = spawn, onEvent, eventRole,
@@ -101,7 +109,7 @@ export async function runCommand(file, args, {
     child.stdin?.end(input);
   });
 }
-export async function runCodexPlan({ project, goal, runner = runCommand, onEvent }) {
+export async function runCodexPlan({ project, goal, runner = runCommand, onEvent, policy }) {
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'mrmak-studio-plan-'));
   const output = path.join(tmp, 'plan.json');
   const spec = [
@@ -109,8 +117,11 @@ export async function runCodexPlan({ project, goal, runner = runCommand, onEvent
     'Do not edit files, run paid tools or use web services. Return ONLY a valid JSON object with no fences:',
     '{"summary":"...","steps":[{"title":"...","role":"codex|claude|qa","prompt":"actionable instructions","acceptance":["testable outcome"],"needs_owner_review":false}]}',
     'Use 2-8 substantial steps, not microtasks. Claude owns art direction/UI/animation. Codex owns gameplay/technology. QA owns automated tests.',
+    'If an autonomous policy is active, place required owner QA/creative acceptance at the END. Perform safe internal checks within implementation steps, not as repeated manual QA gates.',
     'Place independent tasks before dependent tasks. Reference existing files rather than inventing paths.',
     'Preserve established golden visual targets, game design, budget limits and functioning code.',
+    'Owner-approved tool policy for planning (not tool execution): ' + policyBrief(policy),
+    'Handoff MUST include exact paths to Claude MCP/Playwright Extension instructions when available; never copy auth tokens or passwords.',
     'Goal:\n' + goal,
   ].join('\n\n');
   try {
@@ -121,17 +132,24 @@ export async function runCodexPlan({ project, goal, runner = runCommand, onEvent
     return JSON.parse((await readFile(output, 'utf8')).trim());
   } finally { await rm(tmp, { recursive: true, force: true }); }
 }
-export async function runWorker({ role, cwd, prompt, runner = runCommand, onEvent }) {
+export function studioPermissionFlags(role, policy) {
+  if (role === 'codex') return isAutonomous(policy) ? ['--ask-for-approval', 'never'] : [];
+  if (role === 'claude') return ['--permission-mode', isAutonomous(policy) ? 'auto' : 'default'];
+  throw new Error('Unknown studio CLI role');
+}
+export async function runWorker({ role, cwd, prompt, runner = runCommand, onEvent, policy }) {
   if (role === 'qa') throw new Error('QA needs an explicitly approved test job, not an unattended AI worker.');
-  const safety = '\n\nSTUDIO SAFETY: Work only inside this Git worktree. No paid Tripo, external purchases, sign-ins, browser-based AI generation or long-running game QA without owner approval. Never merge, force-push, publish, weaken approved golden targets, or modify other worktrees. Report blockers honestly.';
+  const safety = '\n\nSTUDIO SAFETY: Work only inside this Git worktree. Never merge, force-push, publish, create accounts, circumvent provider restrictions, weaken approved golden targets, or modify other worktrees. Report blockers honestly.\n' + policyBrief(policy);
   if (role === 'codex') {
     const binary = codexBinary();
-    return runner(binary.file, [...binary.args, 'exec', '--json', '--sandbox', 'workspace-write', '-C', cwd, '-'],
-      { cwd, input: prompt + safety, timeoutMs: 45 * 60 * 1000, phase: 'Codex worker', onEvent, eventRole: 'codex' });
+    const opts = studioPermissionFlags('codex', policy);
+    return runner(binary.file, [...binary.args, 'exec', '--json', ...opts, '--sandbox', 'workspace-write', '-C', cwd, '-'],
+      { cwd, input: prompt + safety, timeoutMs: isAutonomous(policy) ? 2 * 60 * 60 * 1000 : 45 * 60 * 1000, phase: 'Codex worker', onEvent, eventRole: 'codex' });
   }
   const claude = commandPath('claude');
   if (!claude) throw new Error('Claude Code CLI is not installed or not in PATH.');
-  const command = wrapCommand(claude, ['-p', '--verbose', '--output-format', 'stream-json', '--permission-mode', 'default']);
+  // Claude Auto retains its own classifier; never use bypassPermissions.
+  const command = wrapCommand(claude, ['-p', '--verbose', '--output-format', 'stream-json', ...studioPermissionFlags('claude', policy)]);
   return runner(command.file, command.args, { cwd, input: prompt + safety,
-    timeoutMs: 45 * 60 * 1000, phase: 'Claude worker', onEvent, eventRole: 'claude' });
+    timeoutMs: isAutonomous(policy) ? 2 * 60 * 60 * 1000 : 45 * 60 * 1000, phase: 'Claude worker', onEvent, eventRole: 'claude' });
 }

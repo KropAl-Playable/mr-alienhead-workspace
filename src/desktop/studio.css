@@ -133,3 +133,17 @@
   .studio-pane-scroll{padding:12px}
 }
 @media(prefers-reduced-motion:reduce){.studio-pulse{animation:none}}
+
+
+/* Batch-scoped autonomous production consent: visible, explicit, reversible per task. */
+.studio-policy-box{margin:12px 0;padding:10px 11px;border:1px solid #bc88a35c;border-radius:9px;background:#322631}
+.studio-create .studio-policy-toggle,.studio-create .studio-policy-consent,.studio-create .studio-policy-tool{display:flex;align-items:flex-start;gap:8px;margin:8px 0;color:#efcfdd;line-height:1.5;font-size:11px}
+.studio-create .studio-policy-toggle small{display:block;color:#b5a5b4}
+.studio-create .studio-policy-toggle strong{color:#e9b4ce}
+.studio-create input[type="checkbox"]{display:inline-block;width:16px;height:16px;min-width:16px;margin:0;margin-top:2px;padding:0;accent-color:#d9a0bb;vertical-align:middle}
+.studio-policy-details{border-top:1px solid #ffffff21;margin-top:12px;padding-top:5px}
+.studio-policy-details p{font-size:11px;color:#d6c1ca}
+.studio-policy-details label{margin:6px 0}
+.studio-policy-details input[type="number"]{max-width:160px}
+.studio-policy-warning{color:#ebc08c!important;border-left:3px solid #dca276;padding:7px 9px;background:#4c332728}
+.studio-autonomy-badge{font-size:11px!important;color:#9ad9b6!important;border:1px solid #9ad9b654;padding:7px 9px;border-radius:7px}

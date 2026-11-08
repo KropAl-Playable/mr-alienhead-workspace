@@ -49,7 +49,7 @@ dictation need no Mr. Mak transcription key.
 
 ## AI Game Studio (experimental)
 
-The **Studio** button in Chats opens an opt-in multi-agent workflow: Codex plans the original task, local Qwen3.5-4B GGUF proposes a route, and Codex/Claude Code workers operate in an isolated Git worktree after owner approval. Nothing auto-merges or spends external-generation credits. This is an initial integration, not an unattended studio. See [Studio Mode setup and limitations](docs/studio-mode.md).
+The **Studio** button in Chats opens an opt-in multi-agent workflow: Codex plans the original task, local Qwen3.5-4B GGUF proposes a route, and Codex/Claude Code workers operate in an isolated Git worktree after owner approval. Nothing auto-merges; external generation is unavailable in guarded mode and may be authorized with a task-specific Studio autonomy policy (browser spending is not metered by Studio). This is an initial integration, not an unattended studio. See [Studio Mode setup and limitations](docs/studio-mode.md).
 
 ## Everyday tools
 
@@ -227,3 +227,8 @@ is supplied for learning and remixing; see [third-party notices](THIRD_PARTY_NOT
 Mr. Mak is small.
 
 <img src="docs/assets/mr-mak.png" alt="Mr. Mak, a small plush pig wearing a black hat" width="420">
+
+
+### Autonomous Studio Mode (experimental)
+
+Studio now supports per-objective approval of Claude Auto mode, Codex sandboxed non-interactive execution and named creative services (Playwright, Blender, Tripo, ImageGen). This **does not** globally remove security controls or enforce third-party browser credit charges. Read [Studio Mode](docs/studio-mode.md) before enabling it; use a limited Tripo credit allowance and review the actual assets/logs.

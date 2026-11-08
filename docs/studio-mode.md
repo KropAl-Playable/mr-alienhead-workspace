@@ -122,3 +122,31 @@ Recovery **does not restore the exact Codex/Claude in-memory conversation**. It 
 Open Studio → select Objective #001 → **Results**. Read the changed Markdown reports individually. The output from Codex/Claude appears in expandable step summaries, and the audit log appears in Live activity (recent tasks only). If older tasks have no saved event history, the new runner cannot reconstruct past activity; the existing generated files remain in the worktree shown in the task details.
 
 If a report is not listed, copy the displayed worktree path and inspect the file directly. The artifact index is deliberately limited to changed \`.md\`, \`.txt\`, \`.json\` and image files, and will not scan/serve arbitrary repository files.
+
+
+## Autonomous production authorization (opt-in per objective)
+
+In **Studio → Tasks → + New objective**, enable **Autonomous production** and select which existing connected services may be used:
+- Playwright Extension MCP / existing logged-in browser sessions
+- Blender
+- Tripo Studio
+- ImageGen / chatgpt.com through permitted existing tools
+
+For Tripo, choose a task-wide credit envelope (100–1500); 500 is the UI starting suggestion, **not** an automatic charge. Smart Mesh estimates 100 credits per attempt; at most **two attempts per asset brief**, with no automatic third attempt. The worktree should contain a provider-job ledger (job IDs, costs, source images and output paths).
+
+**Caution: Studio cannot actually intercept or charge-limit Tripo submissions made in an authenticated browser tab.** The amount is an explicit authorization and instruction to the agents, not a provable hard billing cap. Use the provider's own available limits and monitor its credit balance; if it is unavailable or inconsistent, agents must stop paid generation. Do not authorize this mode with accounts you cannot afford to spend from. The Studio UI repeats this warning before approval and execution.
+
+In the autonomous batch:
+- Claude Code receives \`--permission-mode auto\`: its native permission classifier may still deny risky actions; Studio never enables \`bypassPermissions\` or \`--dangerously-skip-permissions\`.
+- Codex receives \`--ask-for-approval never\` **within** \`--sandbox workspace-write\`. Network access remains subject to the installed Codex sandbox and MCP configuration, and attempts needing elevation fail instead of being silently allowed.
+- The original task is first planned by Codex (read-only). The handoff requests real paths to Playwright Extension MCP setup and requires Claude to verify the connection. Studio does not copy browser cookies, tokens or external logins.
+- Existing provider accounts and sessions may be used for explicitly authorized services, but no new accounts, credit top-ups, bypassing CAPTCHA, publishing or edits to frozen golden targets are authorized.
+- Long native GPU tests are still an owner gate. A final QA/owner review does not mean a task was automatically visually accepted.
+
+### Automatic usage-limit cooldown
+
+If an autonomous Codex/Claude **CLI exits nonzero** with an explicit usage/rate-limit message, Studio enters \`waiting_for_limit_reset\`. Up to **3** retries (30-minute cooldown between attempts) are scheduled while Mr. Mak is running. The retry state is persisted. After a restart, the waiting task is scheduled again, using the previously recorded retry time. Completed steps stay completed; only the interrupted step is replayed in its existing worktree.
+
+Studio cannot know subscription reset times precisely, so retry timing is conservative rather than provider-aware. Unknown failures, missing browser authentication, permission classifier denials, CAPTCHA, and ambiguous Tripo job receipts **do not** trigger automatic retries. A successful CLI exit that only mentions a limit in prose is also not automatically retried. Replaying a step may have side effects; agents are instructed to inspect external job IDs and not duplicate paid submissions. For higher assurance, all paid creation should eventually run through a metered connector with atomic reservations and receipt-based idempotency.
+
+Use **guarded** mode for tasks that shouldn't touch external tools. Only new tasks get the new autonomous policy; legacy tasks are not silently upgraded.

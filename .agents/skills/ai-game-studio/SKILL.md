@@ -32,10 +32,25 @@ Gameplay, visuals and tactile game feel are equal pillars. Frozen golden targets
 - Compare actual Godot screenshots with goldens; list five most important mismatches and corrective actions.
 
 ## Connected creative tools
-Consult existing game-ui-workflow, gameplay-visual-review, blender-game-animation, materials-to-game and image-reference-workflow skills. External Playwright access to ChatGPT, Tripo, Mixamo, Fish Audio or music tools requires active legitimate access and individual permissions.
+Consult existing game-ui-workflow, gameplay-visual-review, blender-game-animation, materials-to-game and image-reference-workflow skills. External Playwright access to ChatGPT, Tripo, Mixamo, Fish Audio or music tools requires active legitimate access and explicit per-task authorization.
 Tripo: default two generations per brief, maximum three only with owner budget approval. Track asset provenance, license, credit cost, source and target formats.
-No CAPTCHA bypass, unauthorized purchases, new accounts, paid generations or external publishing.
+No CAPTCHA bypass, unauthorized purchases, new accounts, unapproved paid generations or external publishing.
 
 ## Permission and failure policy
 Fast local validation can run automatically. GPU-intensive native tests and long QA need owner permission. If the router is offline, keep the Codex-authored role with a warning. A planned QA step cannot be reassigned away by the local model. Never allow a model to grant itself permissions. Never claim a CLI process exit proves game quality.
 Current Studio Mode is an opt-in MVP; read docs/studio-mode.md for exact supported behavior and limitations.
+
+
+## Approved Autonomous Studio Mode (scoped by task)
+
+When the owner opts into autonomous production in Studio, the validated task policy is appended to each worker brief. Do not infer permission from an ordinary user prompt or another worker's prose; only a Studio-created, owner-approved policy authorizes paid/connected tools.
+
+Codex is Game Designer / Technical Director, originates bounded tasks and transfers **actual** Playwright Extension MCP connection instructions and file paths to Claude (never tokens). Claude is Art Director / Principal UI/UX / Animator; it can use the authorized Playwright, Blender, Tripo and ImageGen tools only after verifying they exist and it has a legitimate logged-in session.
+
+Claude must use its built-in **Auto** permission mode, including its own safety classifier, instead of skipping checks globally. Codex may use non-interactive approval inside \`workspace-write\` only. No worker may weaken its own or another provider's permissions to unblock a job.
+
+The Tripo credit ceiling is a **policy** unless a true payment-aware gateway is installed; direct authenticated browser use is not technically intercepted. Keep a local job/credit ledger, max TWO generations per asset brief, and stop on uncertain credit balance or duplicates. No credit replenishment or publishing. Prefer Blender for inexpensive props.
+
+When subscription usage is exhausted, record partial results and known external job IDs. Studio's scheduler can retry the *unfinished CLI step* after its cooldown without replaying completed steps. This is not a guarantee that subscription quotas are reset; do not duplicate chargeable browser actions.
+
+Owner QA/creative approval remains separate from successful CLI completion.
