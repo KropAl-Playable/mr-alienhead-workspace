@@ -1,6 +1,6 @@
 # Project skills
 
-Twenty skills live in this project. `.agents/skills` is the maintained source
+The project includes shared creative and game-production skills, including the experimental AI Game Studio orchestrator skill. `.agents/skills` is the maintained source
 for Codex; `.claude/skills` contains complete, identical copies for Claude Code,
 including scripts and references. Both Skills sections open the full instructions.
 These are local project files, not global installations.
@@ -15,6 +15,7 @@ If you edited a Claude copy directly, first move that intended change into the
 maintained source. `npm run test:template` checks that the two copies agree.
 
 | Skill | Use it for |
+| [ai-game-studio](../.agents/skills/ai-game-studio/SKILL.md) | Coordinate Codex-first planning, Claude visual direction, local decider routing and gated QA with reviewable Git worktrees. |
 | --- | --- |
 | [3d-production-routing](../.agents/skills/3d-production-routing/SKILL.md) | Choose a practical workflow for 3D concepts, generated meshes, material maps, procedural Three.js reconstruction and game animation. |
 | [blender-game-animation](../.agents/skills/blender-game-animation/SKILL.md) | Rig and animate supplied characters in Blender, revise motion from references, and deliver editable sources plus a verified game export. |
